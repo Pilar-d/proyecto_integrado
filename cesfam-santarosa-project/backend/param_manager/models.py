@@ -60,6 +60,10 @@ class Indicador(models.Model):
         RAZON = 'RAZON', 'Razón (numerador / denominador)'
         VALOR = 'VALOR', 'Valor directo (solo numerador)'
 
+    class Orientacion(models.TextChoices):
+        MAYOR_MEJOR = 'MAYOR_MEJOR', 'Mayor es mejor (cobertura: cumplir o superar la meta)'
+        MENOR_MEJOR = 'MENOR_MEJOR', 'Menor es mejor (ej: derivaciones, hospitalizaciones evitables)'
+
     meta = models.ForeignKey(Meta, on_delete=models.CASCADE, related_name='indicadores')
     codigo = models.CharField(max_length=20, help_text='Ej: 6.1.A, 9.2')
     nombre = models.CharField(max_length=255)
@@ -71,6 +75,10 @@ class Indicador(models.Model):
     formula_display = models.TextField(blank=True, default='')
     # Importancia relativa (%) para el cálculo del IAAPS; vacío = no pondera
     ponderacion = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    # Cómo se interpreta la comparación con la meta
+    orientacion = models.CharField(
+        max_length=15, choices=Orientacion.choices, default=Orientacion.MAYOR_MEJOR
+    )
     vigente = models.BooleanField(default=True)
 
     class Meta:

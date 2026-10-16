@@ -52,7 +52,7 @@ class IndicadorSerializer(serializers.ModelSerializer):
         model = Indicador
         fields = [
             'id', 'meta', 'codigo', 'nombre', 'descripcion',
-            'forma_calculo', 'formula_display', 'ponderacion',
+            'forma_calculo', 'orientacion', 'formula_display', 'ponderacion',
             'vigente', 'componentes', 'valores',
         ]
 
@@ -62,7 +62,7 @@ class IndicadorResumenSerializer(serializers.ModelSerializer):
     class Meta:
         model = Indicador
         fields = [
-            'id', 'codigo', 'nombre', 'forma_calculo',
+            'id', 'codigo', 'nombre', 'forma_calculo', 'orientacion',
             'formula_display', 'ponderacion', 'vigente',
         ]
 

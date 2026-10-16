@@ -1,7 +1,7 @@
 // frontend/src/layouts/MainLayout.tsx
 import { useState } from 'react';
 import { Outlet, useNavigate, Link } from 'react-router-dom';
-import { LayoutDashboard, FileSpreadsheet, Settings2, Users, ShieldCheck, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, BarChart3, FileSpreadsheet, Settings2, Users, ShieldCheck, LogOut, Menu, X } from 'lucide-react';
 
 export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -33,6 +33,11 @@ export default function MainLayout() {
           <Link to="/dashboard" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition">
             <LayoutDashboard size={20} />
             {sidebarOpen && <span>Dashboard General</span>}
+          </Link>
+
+          <Link to="/cumplimiento" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition">
+            <BarChart3 size={20} />
+            {sidebarOpen && <span>Reportes de Cumplimiento</span>}
           </Link>
 
           {/* Carga REM: solo Gestor y Subdirección (la Directora NO puede cargar REM, según requerimientos) */}

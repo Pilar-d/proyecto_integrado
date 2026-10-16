@@ -8,9 +8,12 @@ import json
 
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from authentication.models import RegistroAuditoria
-from authentication.permissions import EsConsultaOGestorOSubdireccion
+from authentication.permissions import EsConsultaOGestorOSubdireccion, EsRolConsulta
+from .calc import CORTES_EVALUATIVOS, LibrosREM, calcular_indicador
 from .models import ComponenteDato, Indicador, Meta, MetaValor, Programa
 from .serializers import (
     ComponenteDatoSerializer,
@@ -101,6 +104,78 @@ class ComponenteDatoViewSet(AuditoriaParametrizacionMixin, viewsets.ModelViewSet
         if indicador:
             queryset = queryset.filter(indicador_id=indicador)
         return queryset
+
+
+class CalculoIndicadoresView(APIView):
+    """
+    RF-05 / RF-06: cumplimiento de indicadores para un año y período.
+    GET /api/param/calc/?anio=2026&corte=2&indicador=7
+    - corte: 1 (ene-may), 2 (ene-jul), 3 (ene-sep), 4 (ene-dic);
+      sin corte = acumulado del año.
+    """
+    permission_classes = [IsAuthenticated, EsRolConsulta]
+
+    def get(self, request):
+        from django.utils import timezone
+        try:
+            anio = int(request.query_params.get('anio') or timezone.now().year)
+        except ValueError:
+            return Response({'error': 'Año inválido.'}, status=400)
+
+        corte = request.query_params.get('corte')
+        hasta_mes = None
+        if corte:
+            try:
+                hasta_mes = CORTES_EVALUATIVOS[int(corte)]
+            except (KeyError, ValueError):
+                return Response(
+                    {'error': 'Corte inválido. Use 1 (mayo), 2 (julio), 3 (septiembre) o 4 (diciembre).'},
+                    status=400,
+                )
+
+        indicadores = Indicador.objects.filter(
+            vigente=True, meta__vigente=True,
+        ).select_related('meta', 'meta__programa').prefetch_related('componentes', 'valores')
+
+        indicador_id = request.query_params.get('indicador')
+        if indicador_id:
+            indicadores = indicadores.filter(id=indicador_id)
+
+        libros = LibrosREM(anio, hasta_mes)
+        resultados = []
+        try:
+            for ind in indicadores:
+                r = calcular_indicador(ind, anio, libros)
+                meta_valor = r['meta_valor']
+                resultados.append({
+                    'indicador': ind.id,
+                    'codigo': ind.codigo,
+                    'nombre': ind.nombre,
+                    'meta_codigo': ind.meta.codigo,
+                    'meta_nombre': ind.meta.nombre,
+                    'seccion': ind.meta.seccion,
+                    'programa': ind.meta.programa.nombre if ind.meta.programa else None,
+                    'forma_calculo': ind.forma_calculo,
+                    'orientacion': ind.orientacion,
+                    'ponderacion': ind.ponderacion,
+                    'meta_valor': str(meta_valor) if meta_valor is not None else None,
+                    'numerador': str(r['numerador']),
+                    'denominador': str(r['denominador']) if r['denominador'] is not None else None,
+                    'resultado': str(round(r['resultado'], 2)) if r['resultado'] is not None else None,
+                    'cumplimiento_pct': str(round(r['cumplimiento_pct'], 1)) if r['cumplimiento_pct'] is not None else None,
+                    'estado': r['estado'],
+                    'meses_con_datos': r['meses_con_datos'],
+                    'errores': r['errores'],
+                })
+        finally:
+            libros.cerrar()
+
+        return Response({
+            'anio': anio,
+            'corte': int(corte) if corte else None,
+            'hasta_mes': hasta_mes,
+            'resultados': resultados,
+        })
 
 
 class MetaValorViewSet(AuditoriaParametrizacionMixin, viewsets.ModelViewSet):

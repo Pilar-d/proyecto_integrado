@@ -62,6 +62,7 @@ asignan desde el admin de Django (`/admin/`).
 | `/api/param/indicadores/` | CRUD | Indicadores con forma de cálculo, fórmula y ponderación |
 | `/api/param/componentes/` | CRUD | Origen de datos: hoja + celda del REM (ej: `A02!D14`) o valor fijo |
 | `/api/param/valores/` | CRUD | Valor esperado del indicador por año (meta nacional/comunal) |
+| `/api/param/calc/` | GET | Motor de cálculo: cumplimiento de todos los indicadores. Params: `anio`, `corte` (1-4), `indicador`. Celdas admiten expresiones (`D11-F11`, rangos `H11:X11`) |
 
 ### Validaciones de la carga REM
 
@@ -81,6 +82,10 @@ asignan desde el admin de Django (`/admin/`).
 - [x] Semilla con los 19 indicadores IAAPS 2026 y las 10 metas comunales (Ley 19.813)
 - [ ] CRUD de usuarios con API (rol Gestor)
 - [ ] Bitácora de auditoría con API y filtros
-- [ ] Motor de cálculo de indicadores por corte evaluativo IAAPS
-- [ ] Dashboard con gráficos, reportes por área/programa y comparativos históricos (RF-05 a RF-08)
+- [x] Motor de cálculo: lee las celdas REM parametrizadas, acumula por corte evaluativo IAAPS (mayo/julio/sept/dic) y compara contra la meta (RF-05, RNF-03: <3s verificado)
+- [x] Dashboard y reportes de cumplimiento por sección (RISS/Producción/Impacto/Comunal)
+- [x] Indicadores 6.1.A y 6.1.B con numeradores reales configurados desde el REM (pendiente: denominadores FONASA)
+- [ ] Denominadores oficiales FONASA (población inscrita validada) y mapeo de celdas del resto de indicadores
+- [ ] Comparativos históricos y gráficos avanzados (RF-07, RF-08)
 - [ ] Exportación CSV/XLSX y estructura compatible con Power BI (RF-09, RF-10)
+- [ ] Filtro por programa para Jefe de Programa (solo sus programas y transversales)

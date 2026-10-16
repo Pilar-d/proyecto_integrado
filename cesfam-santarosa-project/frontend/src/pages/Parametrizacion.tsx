@@ -12,7 +12,8 @@ import {
 interface Programa { id: number; nombre: string; descripcion: string; activo: boolean }
 interface IndicadorResumen {
   id: number; codigo: string; nombre: string;
-  forma_calculo: string; formula_display: string; ponderacion: string | null; vigente: boolean;
+  forma_calculo: string; orientacion: string;
+  formula_display: string; ponderacion: string | null; vigente: boolean;
 }
 interface Componente {
   id: number; tipo: string; descripcion: string; origen: string;
@@ -432,6 +433,7 @@ function EditorIndicador({ indicador, meta, onRecargar, onVolver, onError, onOk 
 }) {
   const [nombre, setNombre] = useState(indicador.nombre);
   const [forma, setForma] = useState(indicador.forma_calculo);
+  const [orientacion, setOrientacion] = useState(indicador.orientacion || 'MAYOR_MEJOR');
   const [formula, setFormula] = useState(indicador.formula_display || '');
   const [ponderacion, setPonderacion] = useState(indicador.ponderacion || '');
   const [vigente, setVigente] = useState(indicador.vigente);
@@ -441,7 +443,8 @@ function EditorIndicador({ indicador, meta, onRecargar, onVolver, onError, onOk 
     setGuardando(true);
     try {
       await api.patch(`param/indicadores/${indicador.id}/`, {
-        nombre, forma_calculo: forma, formula_display: formula,
+        nombre, forma_calculo: forma, orientacion,
+        formula_display: formula,
         ponderacion: ponderacion || null, vigente,
       });
       onRecargar();
@@ -492,6 +495,14 @@ function EditorIndicador({ indicador, meta, onRecargar, onVolver, onError, onOk 
               <input type="checkbox" checked={vigente} onChange={(e) => setVigente(e.target.checked)} className="w-5 h-5 accent-lime-500" />
               Vigente
             </label>
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">Orientación de la meta</label>
+            <select value={orientacion} onChange={(e) => setOrientacion(e.target.value)}
+              className="w-full rounded-xl bg-slate-800 border border-slate-700 p-2.5 text-sm text-white focus:border-lime-500 focus:outline-none">
+              <option value="MAYOR_MEJOR">Mayor es mejor (coberturas)</option>
+              <option value="MENOR_MEJOR">Menor es mejor (derivaciones, hospitalizaciones)</option>
+            </select>
           </div>
           <div className="md:col-span-2">
             <label className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
@@ -637,7 +648,7 @@ function ComponentesPanel({ indicador, onRecargar, onError, onOk }: {
           {form.origen === 'REM' ? (
             <>
               <input value={form.rem_hoja} onChange={(e) => setForm({ ...form, rem_hoja: e.target.value.toUpperCase() })} placeholder="Hoja (A02)" className={inputCls + ' font-mono'} />
-              <input value={form.rem_celda} onChange={(e) => setForm({ ...form, rem_celda: e.target.value.toUpperCase() })} placeholder="Celda (D14)" className={inputCls + ' font-mono'} />
+              <input value={form.rem_celda} onChange={(e) => setForm({ ...form, rem_celda: e.target.value.toUpperCase() })} placeholder="Celda (D14 o D11-F11)" className={inputCls + ' font-mono'} />
             </>
           ) : (
             <>
