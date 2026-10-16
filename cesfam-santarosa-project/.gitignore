@@ -1,0 +1,18 @@
+# Python / Django
+backend/venv/
+__pycache__/
+*.pyc
+*.pyo
+backend/db.sqlite3
+backend/media/
+*.log
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+.vite-temp/
+
+# Sistema
+.DS_Store
+Thumbs.db
