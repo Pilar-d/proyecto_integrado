@@ -42,6 +42,21 @@ class EsGestorOSubdireccion(BasePermission):
         return False
 
 
+class EsConsultaOGestorOSubdireccion(BasePermission):
+    """Consulta para todos los roles; escritura solo para Gestor y Subdirección."""
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        if user.is_superuser:
+            return True
+        rol = nombre_rol(user)
+        if request.method in ('GET', 'HEAD', 'OPTIONS'):
+            return rol in (ROL_GESTOR, ROL_SUBDIRECCION, ROL_DIRECTORA, ROL_JEFE_PROGRAMA)
+        return rol in (ROL_GESTOR, ROL_SUBDIRECCION)
+
+
 class EsRolConsulta(BasePermission):
     """Permite consultar reportes: todos los roles institucionales."""
 

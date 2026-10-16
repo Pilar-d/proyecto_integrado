@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'authentication',
     'rem_manager',
+    'param_manager',
 ]
 
 MIDDLEWARE = [

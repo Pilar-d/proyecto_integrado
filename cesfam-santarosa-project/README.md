@@ -57,6 +57,11 @@ asignan desde el admin de Django (`/admin/`).
 | `/api/token/refresh/` | POST | Renueva el token de acceso |
 | `/api/rem/upload/` | POST | Carga y validación de planilla REM Serie A (Gestor/Subdirección) |
 | `/api/rem/archivos/` | GET | Historial de cargas REM (Gestor/Subdirección) |
+| `/api/param/programas/` | CRUD | Programas y áreas del consultorio |
+| `/api/param/metas/` | CRUD | Metas (IAAPS y comunales), con filtros `?seccion=` `?programa=` `?search=` |
+| `/api/param/indicadores/` | CRUD | Indicadores con forma de cálculo, fórmula y ponderación |
+| `/api/param/componentes/` | CRUD | Origen de datos: hoja + celda del REM (ej: `A02!D14`) o valor fijo |
+| `/api/param/valores/` | CRUD | Valor esperado del indicador por año (meta nacional/comunal) |
 
 ### Validaciones de la carga REM
 
@@ -71,10 +76,11 @@ asignan desde el admin de Django (`/admin/`).
 - [x] Autenticación JWT por RUT con rol real (RF-01, RF-02)
 - [x] Carga de REM Serie A con validación e historial (RF-03)
 - [x] Auditoría de logins y cargas (RF-12)
-- [x] Vistas: Login, Dashboard (placeholder), Carga REM, Usuarios (maqueta), Auditoría (maqueta)
+- [x] Vistas: Login, Dashboard (placeholder), Carga REM, Parametrización, Usuarios (maqueta), Auditoría (maqueta)
+- [x] Administración de metas: programas, metas, indicadores, fórmulas, celdas REM y valores anuales (RF-04)
+- [x] Semilla con los 19 indicadores IAAPS 2026 y las 10 metas comunales (Ley 19.813)
 - [ ] CRUD de usuarios con API (rol Gestor)
 - [ ] Bitácora de auditoría con API y filtros
-- [ ] Parametrización de metas, indicadores, fórmulas y celdas REM (RF-04, RF-11)
 - [ ] Motor de cálculo de indicadores por corte evaluativo IAAPS
 - [ ] Dashboard con gráficos, reportes por área/programa y comparativos históricos (RF-05 a RF-08)
 - [ ] Exportación CSV/XLSX y estructura compatible con Power BI (RF-09, RF-10)

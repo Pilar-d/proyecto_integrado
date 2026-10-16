@@ -1,7 +1,7 @@
 // frontend/src/layouts/MainLayout.tsx
 import { useState } from 'react';
 import { Outlet, useNavigate, Link } from 'react-router-dom';
-import { LayoutDashboard, FileSpreadsheet, Users, ShieldCheck, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, FileSpreadsheet, Settings2, Users, ShieldCheck, LogOut, Menu, X } from 'lucide-react';
 
 export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -40,6 +40,14 @@ export default function MainLayout() {
             <Link to="/admin-rem" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition">
               <FileSpreadsheet size={20} />
               {sidebarOpen && <span>Carga y Gestión REM</span>}
+            </Link>
+          )}
+
+          {/* Parametrización: Gestor y Subdirección (RF-04 / RF-11) */}
+          {(userRole === 'Gestor' || userRole === 'Subdireccion') && (
+            <Link to="/parametrizacion" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition">
+              <Settings2 size={20} />
+              {sidebarOpen && <span>Parametrización de Metas</span>}
             </Link>
           )}
 

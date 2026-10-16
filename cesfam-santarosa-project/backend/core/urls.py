@@ -24,4 +24,5 @@ urlpatterns = [
     path('api/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/rem/', include('rem_manager.urls')),
+    path('api/param/', include('param_manager.urls')),
 ]

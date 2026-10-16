@@ -6,6 +6,7 @@ import MainLayout from './layouts/MainLayout';
 import AdminRem from './pages/AdminRem';
 import UserManagement from './pages/UserManagement';
 import AuditLog from './pages/AuditLog';
+import Parametrizacion from './pages/Parametrizacion';
 
 // Componente para proteger rutas según autenticación
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -35,6 +36,7 @@ export default function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardHome />} />
           <Route path="admin-rem" element={<AdminRem />} />
+          <Route path="parametrizacion" element={<Parametrizacion />} />
           <Route path="usuarios" element={<UserManagement />} />
           <Route path="audit" element={<AuditLog />} />
         </Route>
