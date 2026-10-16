@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
-import { Lock, User, Plus } from 'lucide-react';
+import { Lock, User } from 'lucide-react';
 import bgImage from '../assets/cesfam.jpeg'; // Tu imagen de fondo desde assets
 import logoImage from '../assets/logo.png'; // Cambia 'tu-logo.png' por el nombre real de tu archivo
 
@@ -22,9 +22,11 @@ export default function Login() {
         password: password
       });
 
+      // El rol real llega desde el backend (RF-02): se usa para mostrar/ocultar módulos.
       localStorage.setItem('access_token', response.data.access);
       localStorage.setItem('refresh_token', response.data.refresh);
-      localStorage.setItem('user_role', 'Gestor');
+      localStorage.setItem('user_role', response.data.rol || 'SinRol');
+      localStorage.setItem('user_name', response.data.nombre || '');
 
       navigate('/dashboard');
     } catch (err: any) {

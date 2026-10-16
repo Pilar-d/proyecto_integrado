@@ -1,5 +1,5 @@
 // frontend/src/pages/AuditLog.tsx
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ShieldCheck, Filter, Calendar, User, Activity } from 'lucide-react';
 
 export default function AuditLog() {

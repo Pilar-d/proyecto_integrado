@@ -1,5 +1,5 @@
 // frontend/src/layouts/MainLayout.tsx
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Outlet, useNavigate, Link } from 'react-router-dom';
 import { LayoutDashboard, FileSpreadsheet, Users, ShieldCheck, LogOut, Menu, X } from 'lucide-react';
 
@@ -7,7 +7,8 @@ export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const navigate = useNavigate();
   
-  const userRole = localStorage.getItem('user_role') || 'JefePrograma';
+  // Roles oficiales: Directora | Subdireccion | Gestor | JefePrograma
+  const userRole = localStorage.getItem('user_role') || 'SinRol';
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -34,24 +35,28 @@ export default function MainLayout() {
             {sidebarOpen && <span>Dashboard General</span>}
           </Link>
 
-          {(userRole === 'Gestor' || userRole === 'Directora') && (
+          {/* Carga REM: solo Gestor y Subdirección (la Directora NO puede cargar REM, según requerimientos) */}
+          {(userRole === 'Gestor' || userRole === 'Subdireccion') && (
             <Link to="/admin-rem" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition">
               <FileSpreadsheet size={20} />
               {sidebarOpen && <span>Carga y Gestión REM</span>}
             </Link>
           )}
 
+          {/* Gestión de usuarios y bitácora: exclusivos del Gestor de Información */}
           {userRole === 'Gestor' && (
+            <>
             <Link to="/usuarios" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition">
               <Users size={20} />
               {sidebarOpen && <span>Gestión de Usuarios</span>}
             </Link>
-          )}
 
-          <Link to="/audit" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition">
-            <ShieldCheck size={20} />
-            {sidebarOpen && <span>Bitácora de Auditoría</span>}
-          </Link>
+            <Link to="/audit" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition">
+              <ShieldCheck size={20} />
+              {sidebarOpen && <span>Bitácora de Auditoría</span>}
+            </Link>
+            </>
+          )}
         </nav>
 
         <div className="p-4 border-t border-slate-800">

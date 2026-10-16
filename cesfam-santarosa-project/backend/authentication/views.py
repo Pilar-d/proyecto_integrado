@@ -5,6 +5,8 @@ from rest_framework.views import APIView
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from .models import RegistroAuditoria
+
 class CustomTokenSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
@@ -28,9 +30,23 @@ class CustomTokenSerializer(serializers.Serializer):
         # Generamos los tokens JWT de forma manual y segura
         refresh = RefreshToken.for_user(user)
 
+        # El rol real del usuario (RF-02): se devuelve al frontend para
+        # mostrar/ocultar módulos según el perfil institucional.
+        rol = user.rol.nombre_rol if user.rol else None
+        refresh['rol'] = rol
+
+        # RF-12: toda transacción queda registrada con usuario, fecha y hora
+        RegistroAuditoria.objects.create(
+            usuario=user,
+            accion='LOGIN_EXITOSO',
+            tabla_afectada='AUTH',
+        )
+
         return {
             'refresh': str(refresh),
             'access': str(refresh.access_token),
+            'rol': rol,
+            'nombre': user.get_full_name() or user.username,
         }
 
 class CustomTokenObtainPairView(APIView):

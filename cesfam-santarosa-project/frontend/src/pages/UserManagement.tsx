@@ -1,5 +1,5 @@
 // frontend/src/pages/UserManagement.tsx
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Users, UserPlus, Shield, CheckCircle2, XCircle } from 'lucide-react';
 
 export default function UserManagement() {

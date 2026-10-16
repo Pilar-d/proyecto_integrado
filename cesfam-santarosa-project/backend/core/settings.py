@@ -11,7 +11,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = 'django-insecure-cesfam-santarosa-key'
 DEBUG = True
-ALLOWED_HOSTS = []
+# Hosts permitidos en desarrollo (incluye 'testserver' usado por los tests de Django)
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -70,6 +71,10 @@ TIME_ZONE = 'America/Santiago'
 USE_I18N = True
 USE_TZ = True
 STATIC_URL = 'static/'
+
+# Almacenamiento de las planillas REM cargadas
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = 'media/'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
