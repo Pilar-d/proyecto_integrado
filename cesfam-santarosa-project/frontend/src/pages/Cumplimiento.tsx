@@ -1,9 +1,8 @@
 // frontend/src/pages/Cumplimiento.tsx
-// RF-05 / RF-06: Reporte de cumplimiento de indicadores por período.
-// Usa el motor de cálculo del backend: GET /api/param/calc/
 import { useEffect, useState } from 'react';
 import api from '../api/axios';
-import { BarChart3, RefreshCw, TrendingUp, TrendingDown, Minus, Info } from 'lucide-react';
+import { BarChart3, RefreshCw, TrendingUp, TrendingDown, Minus, Info, Calendar } from 'lucide-react';
+import ModalDetalleIndicador from '../components/ModalDetalleIndicador';
 
 interface ResultadoCalc {
   indicador: number;
@@ -88,8 +87,11 @@ function BarraCumplimiento({ pct }: { pct: number | null }) {
 export default function Cumplimiento({ titulo = 'Reportes de Cumplimiento', compacto = false }: {
   titulo?: string; compacto?: boolean;
 }) {
+  const [indicadorSeleccionado, setIndicadorSeleccionado] = useState<ResultadoCalc | null>(null);
   const [anio, setAnio] = useState(String(new Date().getFullYear()));
   const [corte, setCorte] = useState('');
+  const [fechaInicio, setFechaInicio] = useState('');
+  const [fechaFin, setFechaFin] = useState('');
   const [resultados, setResultados] = useState<ResultadoCalc[]>([]);
   const [meses, setMeses] = useState<number>(12);
   const [cargando, setCargando] = useState(false);
@@ -100,7 +102,12 @@ export default function Cumplimiento({ titulo = 'Reportes de Cumplimiento', comp
     setError('');
     try {
       const res = await api.get('param/calc/', {
-        params: { anio, ...(corte ? { corte } : {}) },
+        params: { 
+          anio, 
+          ...(corte ? { corte } : {}),
+          ...(fechaInicio ? { fecha_inicio: fechaInicio } : {}),
+          ...(fechaFin ? { fecha_fin: fechaFin } : {})
+        },
       });
       setResultados(res.data.resultados);
       setMeses(res.data.hasta_mes || 12);
@@ -111,7 +118,7 @@ export default function Cumplimiento({ titulo = 'Reportes de Cumplimiento', comp
     }
   };
 
-  useEffect(() => { cargar(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [anio, corte]);
+  useEffect(() => { cargar(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [anio, corte, fechaInicio, fechaFin]);
 
   const agrupados = SECCIONES_ORDEN
     .map((s) => ({ seccion: s, items: resultados.filter((r) => r.seccion === s) }))
@@ -125,34 +132,50 @@ export default function Cumplimiento({ titulo = 'Reportes de Cumplimiento', comp
 
   return (
     <div className="w-full min-h-full bg-white p-6 md:p-8 space-y-6">
-      {/* Cabecera */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-2xl bg-blue-950 text-lime-400 shadow-md">
-            <BarChart3 size={26} />
-          </div>
-          <div>
-            <h3 className="text-xl font-black text-blue-950">{titulo}</h3>
-            <p className="text-sm font-medium text-slate-500 mt-0.5">
-              Indicadores calculados automáticamente desde los REM cargados, según la
-              parametrización de metas vigente.
-            </p>
-          </div>
+      
+      {/* Cabecera del Módulo Centrada y sin icono */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex-1 flex flex-col items-center text-center space-y-1">
+          <h3 className="text-xl font-black text-blue-950">{titulo}</h3>
+          <p className="text-sm font-medium text-slate-500 max-w-2xl">
+            Indicadores calculados automáticamente desde los REM cargados, según la parametrización de metas vigente.
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <input
-            type="number" value={anio} onChange={(e) => setAnio(e.target.value)}
-            className="w-24 rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-sm font-bold text-blue-950 focus:border-blue-900 focus:outline-none"
-          />
-          <select
-            value={corte} onChange={(e) => setCorte(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-sm text-slate-900 focus:border-blue-900 focus:outline-none"
-          >
-            {CORTES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
-          <button onClick={cargar} className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700">
-            <RefreshCw size={16} className={cargando ? 'animate-spin' : ''} />
-          </button>
+      </div>
+
+      {/* Buscador de Fechas (Inputs de tipo fecha bajo el título) */}
+      <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase">
+          <Calendar size={16} className="text-blue-950" />
+          <span>Filtrar por Rango de Fechas:</span>
+        </div>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2 flex-1 sm:flex-initial">
+            <label className="text-xs font-semibold text-slate-500">Desde:</label>
+            <input 
+              type="date" 
+              value={fechaInicio} 
+              onChange={(e) => setFechaInicio(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-slate-50/50 p-2 text-xs font-semibold text-slate-800 focus:border-blue-900 focus:outline-none" 
+            />
+          </div>
+          <div className="flex items-center gap-2 flex-1 sm:flex-initial">
+            <label className="text-xs font-semibold text-slate-500">Hasta:</label>
+            <input 
+              type="date" 
+              value={fechaFin} 
+              onChange={(e) => setFechaFin(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-slate-50/50 p-2 text-xs font-semibold text-slate-800 focus:border-blue-900 focus:outline-none" 
+            />
+          </div>
+          {(fechaInicio || fechaFin) && (
+            <button 
+              onClick={() => { setFechaInicio(''); setFechaFin(''); }} 
+              className="text-xs font-bold text-rose-600 hover:underline px-2 py-1 cursor-pointer"
+            >
+              Limpiar
+            </button>
+          )}
         </div>
       </div>
 
@@ -208,7 +231,12 @@ export default function Cumplimiento({ titulo = 'Reportes de Cumplimiento', comp
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
                   {grupo.items.map((r) => (
-                    <tr key={`${r.indicador}`} className="hover:bg-slate-50/80 transition">
+                    <tr 
+                      key={`${r.indicador}`} 
+                      onClick={() => setIndicadorSeleccionado(r)}
+                      className="hover:bg-blue-50/50 transition cursor-pointer"
+                      title="Haz clic para ver el desglose y celdas REM"
+                    >
                       <td className="py-3 px-4 font-bold text-blue-950 whitespace-nowrap">{r.codigo}</td>
                       <td className="py-3 px-4">
                         <div className="font-semibold text-slate-800 max-w-[260px] truncate" title={r.nombre}>{r.nombre}</div>
@@ -247,6 +275,14 @@ export default function Cumplimiento({ titulo = 'Reportes de Cumplimiento', comp
           </ul>
         </div>
       )}
+
+      {/* Modal de Detalle de Indicador */}
+      <ModalDetalleIndicador 
+        isOpen={Boolean(indicadorSeleccionado)} 
+        onClose={() => setIndicadorSeleccionado(null)} 
+        indicador={indicadorSeleccionado} 
+      />
+
     </div>
   );
 }

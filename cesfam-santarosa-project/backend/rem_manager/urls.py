@@ -1,9 +1,18 @@
-# rem_manager/urls.py
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import (
+    RemUploadViewSet, 
+    ParametrizacionIndicadorViewSet, 
+    ReporteIndicadorViewSet, 
+    AuditLogViewSet
+)
 
-from .views import RemArchivoListView, RemUploadView
+router = DefaultRouter()
+router.register(r'rem/upload', RemUploadViewSet, basename='rem-upload')
+router.register(r'parametrizacion', ParametrizacionIndicadorViewSet, basename='parametrizacion')
+router.register(r'reportes', ReporteIndicadorViewSet, basename='reportes')
+router.register(r'auditoria', AuditLogViewSet, basename='auditoria')
 
 urlpatterns = [
-    path('upload/', RemUploadView.as_view(), name='rem-upload'),
-    path('archivos/', RemArchivoListView.as_view(), name='rem-archivos'),
+    path('api/v1/', include(router.urls)),
 ]
