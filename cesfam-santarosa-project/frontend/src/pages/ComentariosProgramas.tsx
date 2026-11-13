@@ -1,4 +1,3 @@
-// frontend/src/pages/ComentariosProgramas.tsx
 import React, { useState } from 'react';
 import { MessageSquare, Send, Calendar, User } from 'lucide-react';
 

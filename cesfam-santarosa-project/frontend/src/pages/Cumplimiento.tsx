@@ -1,4 +1,3 @@
-// frontend/src/pages/Cumplimiento.tsx
 import { useEffect, useState } from 'react';
 import api from '../api/axios';
 import { BarChart3, RefreshCw, TrendingUp, TrendingDown, Minus, Info, Calendar } from 'lucide-react';

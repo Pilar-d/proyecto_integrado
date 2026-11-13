@@ -1,3 +1,4 @@
+// frontend/src/layouts/DisenoPrincipal.tsx
 import React, { useState } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
@@ -13,7 +14,13 @@ export default function DisenoPrincipal() {
   
   const userRole = localStorage.getItem('user_role') || 'Directora';
   const userName = localStorage.getItem('user_name') || 'Funcionario';
-  const userPhoto = localStorage.getItem('user_photo') || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150';
+  
+  // Nueva imagen para el Jefe de Programa y la institucional por defecto para los demás
+  const fotoPorDefecto = userRole === 'Jefe de Programa' || userRole === 'JefePrograma'
+    ? 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150' // <--- Nueva foto para Jefe de Programa
+    : 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150';
+
+  const userPhoto = localStorage.getItem('user_photo') || fotoPorDefecto;
 
   const handleLogout = () => {
     localStorage.clear();
@@ -118,14 +125,6 @@ export default function DisenoPrincipal() {
               {sidebarOpen && <span className="truncate">Bitácora de Auditoría</span>}
             </Link>
           )}
-
-          <Link 
-            to="/comentarios-programas" 
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition ${sidebarOpen ? 'justify-start' : 'justify-center'} ${location.pathname === '/comentarios-programas' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
-          >
-            <MessageSquare size={18} className="shrink-0" />
-            {sidebarOpen && <span className="truncate">Comentarios Clínicos</span>}
-          </Link>
         </nav>
 
         {/* Configuraciones de Cuenta y Botón Cerrar Sesión */}

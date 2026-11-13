@@ -8,7 +8,6 @@ import CargaYParametrizacionRem from './pages/CargaYParametrizacionRem';
 import BitacoraAuditoria from './pages/BitacoraAuditoria';
 import Cumplimiento from './pages/Cumplimiento';
 import ReportesDirectora from './pages/ReportesDirectora';
-import ComentariosDirectora from './pages/ComentariosDirectora';
 import ConfiguracionCuenta from './pages/ConfiguracionCuenta';
 import EstadoDatos from './pages/EstadoDatos';
 import ReporteHistorico from './pages/ReporteHistorico';
@@ -33,7 +32,6 @@ export default function App() {
           <Route path="admin-rem" element={<CargaYParametrizacionRem />} />
           <Route path="audit" element={<BitacoraAuditoria />} />
           <Route path="reportes" element={<ReportesDirectora />} />
-          <Route path="comentarios-programas" element={<ComentariosDirectora />} />
           <Route path="configuracion-cuenta" element={<ConfiguracionCuenta />} />
           <Route path="estado-datos" element={<EstadoDatos />} />
           <Route path="historico" element={<ReporteHistorico />} />

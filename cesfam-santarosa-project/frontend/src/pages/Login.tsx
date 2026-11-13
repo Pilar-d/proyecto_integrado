@@ -1,4 +1,3 @@
-// frontend/src/pages/Login.tsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, User } from 'lucide-react';
@@ -19,8 +18,8 @@ export default function Login() {
     const usuariosPrueba: Record<string, { rol: string; nombre: string; foto: string }> = {
       '11111111-1': { rol: 'Directora', nombre: 'Dra. Carmen Valdés', foto: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150' },
       '22222222-2': { rol: 'Subdireccion', nombre: 'Mg. Roberto Soto', foto: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150' },
-      '33333333-3': { rol: 'Gestor', nombre: 'Gdi. Juan Pérez', foto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150' },
-      '44444444-4': { rol: 'JefePrograma', nombre: 'Enf. Marcela Riquelme', foto: 'https://images.unsplash.com/photo-1594824813574-724bc2754643?w=150' },
+      '33333333-3': { rol: 'Gestor', nombre: 'GDI. Maria Perez', foto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150' },
+      '44444444-4': { rol: 'JefePrograma', nombre: 'Enf. Marcela Riquelme', foto: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150' },
     };
 
     const usuarioEncontrado = usuariosPrueba[rut.trim()];

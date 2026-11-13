@@ -1,4 +1,3 @@
-// frontend/src/pages/DashboardDirectora.tsx
 import React, { useState } from 'react';
 import { Filter, Download, TrendingUp, CheckCircle, AlertTriangle } from 'lucide-react';
 

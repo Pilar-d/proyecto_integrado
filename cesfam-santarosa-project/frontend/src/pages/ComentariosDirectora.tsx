@@ -1,4 +1,3 @@
-// frontend/src/pages/ComentariosDirectora.tsx
 import React, { useState } from 'react';
 import { MessageSquare, Search, Filter, Calendar, Clock, User, Shield, AlertCircle, CheckCircle2, Plus, X, Tag } from 'lucide-react';
 
