@@ -1,0 +1,32 @@
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Entornos virtuales Python
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Base de datos local
+*.sqlite3
+*.sqlite3*
+db.sqlite3
+db.sqlite3*
+
+# Dependencias y compilación de Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Variables de entorno secretas
+.env
+backend/.env
+frontend/.env
+
+# Respaldo original
+_backup_original/

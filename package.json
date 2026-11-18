@@ -1,0 +1,13 @@
+{
+  "name": "cesfam-santa-rosa-monorepo",
+  "version": "1.0.0",
+  "description": "Sistema de Monitoreo de Metas Sanitarias - CESFAM Santa Rosa",
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "cd backend && python3 manage.py runserver 8000",
+    "build:frontend": "npm --prefix frontend run build"
+  },
+  "keywords": ["cesfam", "django", "react", "salud"],
+  "author": "",
+  "license": "ISC"
+}
