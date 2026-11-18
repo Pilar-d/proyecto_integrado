@@ -12,7 +12,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.models import Registros
-from api.permissions import EsConsultaOGestorOSubdireccion, EsRolConsulta
+from api.permissions import (
+    EsConsultaOGestorOSubdireccion,
+    EsGestorOSubdireccion,
+    EsRolConsulta,
+)
 from .calc import CORTES_EVALUATIVOS, LibrosREM, calcular_indicador
 from .models import ComponenteDato, Indicador, Meta, MetaValor, Programa
 from .serializers import (
@@ -148,6 +152,16 @@ class CalculoIndicadoresView(APIView):
         if indicador_id:
             indicadores = indicadores.filter(id=indicador_id)
 
+        programa_filtro = request.query_params.get('programa')
+        if programa_filtro and programa_filtro.lower() != 'todos':
+            from django.db.models import Q
+            indicadores = indicadores.filter(
+                Q(meta__programa__nombre__icontains=programa_filtro) |
+                Q(meta__nombre__icontains=programa_filtro)
+            )
+
+        sector_filtro = request.query_params.get('sector')
+
         libros = LibrosREM(anio, hasta_mes)
         resultados = []
         try:
@@ -181,6 +195,8 @@ class CalculoIndicadoresView(APIView):
             'anio': anio,
             'corte': int(corte) if corte else None,
             'hasta_mes': hasta_mes,
+            'sector': sector_filtro or 'Todos',
+            'programa': programa_filtro or 'Todos',
             'resultados': resultados,
         })
 
@@ -412,4 +428,130 @@ class PoblacionParametrizacionView(APIView):
             'message': f'Población y denominadores para el año {anio} actualizados correctamente.',
             'poblacion': {c: str(getattr(pob, c)) for c in campos},
             'denominadores': _get_resumen_denominadores()
+        })
+
+
+class ParametrizarMetasCeldasView(APIView):
+    """
+    RF-04 y RF-11: Consulta y parametrización de metas comprometidas, ponderaciones y celdas REM por indicador.
+    """
+    def get_permissions(self):
+        if self.request.method in ('GET', 'HEAD', 'OPTIONS'):
+            return [AllowAny()]
+        return [IsAuthenticated(), EsGestorOSubdireccion()]
+
+    def get(self, request):
+        anio = int(request.query_params.get('anio', 2026))
+        indicadores = Indicador.objects.select_related('meta', 'meta__programa').prefetch_related('componentes', 'valores').order_by('meta__seccion', 'codigo')
+        
+        datos = []
+        for ind in indicadores:
+            valor_obj = next((v for v in ind.valores.all() if v.anio == anio), None)
+            comp_num = next((c for c in ind.componentes.all() if c.tipo == 'NUMERADOR' and c.activo), None)
+            comp_den = next((c for c in ind.componentes.all() if c.tipo == 'DENOMINADOR' and c.activo), None)
+
+            datos.append({
+                'id': ind.id,
+                'codigo': ind.codigo,
+                'nombre': ind.nombre,
+                'descripcion': ind.descripcion,
+                'meta_codigo': ind.meta.codigo,
+                'meta_nombre': ind.meta.nombre,
+                'seccion': ind.meta.seccion,
+                'programa': ind.meta.programa.nombre if ind.meta.programa else None,
+                'forma_calculo': ind.forma_calculo,
+                'orientacion': ind.orientacion,
+                'formula_display': ind.formula_display,
+                'ponderacion': str(ind.ponderacion) if ind.ponderacion is not None else '',
+                'meta_valor': str(valor_obj.valor) if valor_obj and valor_obj.valor is not None else '',
+                'num_hoja': comp_num.rem_hoja if comp_num and comp_num.origen == 'REM' else '',
+                'num_celda': comp_num.rem_celda if comp_num and comp_num.origen == 'REM' else '',
+                'num_descripcion': comp_num.descripcion if comp_num else '',
+                'den_origen': comp_den.origen if comp_den else 'NO_APLICA',
+                'den_valor_fijo': str(comp_den.valor_fijo) if comp_den and comp_den.valor_fijo is not None else '',
+                'den_hoja': comp_den.rem_hoja if comp_den and comp_den.origen == 'REM' else '',
+                'den_celda': comp_den.rem_celda if comp_den and comp_den.origen == 'REM' else '',
+                'den_descripcion': comp_den.descripcion if comp_den else '',
+            })
+
+        return Response({
+            'anio': anio,
+            'total': len(datos),
+            'indicadores': datos
+        })
+
+    def post(self, request):
+        from decimal import Decimal
+        ind_id = request.data.get('indicador_id')
+        if not ind_id:
+            return Response({'error': 'Debe especificar el indicador_id.'}, status=400)
+
+        indicador = Indicador.objects.filter(id=ind_id).first()
+        if not indicador:
+            return Response({'error': 'Indicador no encontrado.'}, status=404)
+
+        anio = int(request.data.get('anio', 2026))
+        meta_valor = request.data.get('meta_valor')
+        ponderacion = request.data.get('ponderacion')
+        num_hoja = request.data.get('num_hoja', '').strip()
+        num_celda = request.data.get('num_celda', '').strip()
+        descripcion_celda = request.data.get('num_descripcion', '').strip()
+
+        # Guardar ponderación si viene
+        if ponderacion is not None and str(ponderacion).strip() != '':
+            try:
+                indicador.ponderacion = Decimal(str(ponderacion))
+                indicador.save(update_fields=['ponderacion'])
+            except Exception:
+                pass
+
+        # Guardar valor de meta para el año
+        if meta_valor is not None and str(meta_valor).strip() != '':
+            try:
+                MetaValor.objects.update_or_create(
+                    indicador=indicador,
+                    anio=anio,
+                    defaults={'valor': Decimal(str(meta_valor)), 'comentario': f'Parametrizado para el año {anio}'}
+                )
+            except Exception:
+                pass
+
+        # Guardar o actualizar celda REM de numerador (RF-11)
+        if num_hoja or num_celda:
+            ComponenteDato.objects.update_or_create(
+                indicador=indicador,
+                tipo='NUMERADOR',
+                defaults={
+                    'origen': 'REM',
+                    'rem_hoja': num_hoja,
+                    'rem_celda': num_celda,
+                    'descripcion': descripcion_celda or f'Conteo desde REM {num_hoja}!{num_celda}',
+                    'activo': True
+                }
+            )
+
+        # Auditoría (RF-12)
+        try:
+            rol_nombre = getattr(getattr(request.user, 'rol', None), 'nombre_rol', 'Gestor')
+            Registros.objects.create(
+                usuario=request.user if request.user.is_authenticated else None,
+                accion='PARAMETRIZAR_META_CELDA',
+                rol_usuario=rol_nombre,
+                tabla_afectada='Indicador_ComponenteDato',
+                valor_nuevo={
+                    'indicador': indicador.codigo,
+                    'meta_valor': str(meta_valor),
+                    'ponderacion': str(ponderacion),
+                    'num_hoja': num_hoja,
+                    'num_celda': num_celda,
+                    'anio': anio
+                },
+                ip_origen=request.META.get('REMOTE_ADDR', '127.0.0.1')
+            )
+        except Exception:
+            pass
+
+        return Response({
+            'status': 'success',
+            'message': f'Parámetros y celdas del indicador {indicador.codigo} actualizados con éxito.',
         })

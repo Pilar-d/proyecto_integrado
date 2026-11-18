@@ -89,6 +89,8 @@ export default function Cumplimiento({ titulo = 'Reportes de Cumplimiento', comp
   const [indicadorSeleccionado, setIndicadorSeleccionado] = useState<ResultadoCalc | null>(null);
   const [anio, setAnio] = useState(String(new Date().getFullYear()));
   const [corte, setCorte] = useState('');
+  const [sector, setSector] = useState('Todos los Sectores');
+  const [programa, setPrograma] = useState('Todos los Programas');
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
   const [resultados, setResultados] = useState<ResultadoCalc[]>([]);
@@ -104,6 +106,8 @@ export default function Cumplimiento({ titulo = 'Reportes de Cumplimiento', comp
         params: { 
           anio, 
           ...(corte ? { corte } : {}),
+          ...(sector !== 'Todos los Sectores' ? { sector } : {}),
+          ...(programa !== 'Todos los Programas' ? { programa } : {}),
           ...(fechaInicio ? { fecha_inicio: fechaInicio } : {}),
           ...(fechaFin ? { fecha_fin: fechaFin } : {})
         },
@@ -117,16 +121,23 @@ export default function Cumplimiento({ titulo = 'Reportes de Cumplimiento', comp
     }
   };
 
-  useEffect(() => { cargar(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [anio, corte, fechaInicio, fechaFin]);
+  useEffect(() => { cargar(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [anio, corte, sector, programa, fechaInicio, fechaFin]);
+
+  const filtrados = resultados.filter((r) => {
+    if (programa !== 'Todos los Programas' && r.programa && !r.programa.toLowerCase().includes(programa.toLowerCase())) {
+      return false;
+    }
+    return true;
+  });
 
   const agrupados = SECCIONES_ORDEN
-    .map((s) => ({ seccion: s, items: resultados.filter((r) => r.seccion === s) }))
+    .map((s) => ({ seccion: s, items: filtrados.filter((r) => r.seccion === s) }))
     .filter((g) => g.items.length > 0);
 
   const resumen = {
-    cumple: resultados.filter((r) => r.estado === 'CUMPLE').length,
-    riesgo: resultados.filter((r) => r.estado === 'EN_RIESGO').length,
-    nocumple: resultados.filter((r) => r.estado === 'NO_CUMPLE').length,
+    cumple: filtrados.filter((r) => r.estado === 'CUMPLE').length,
+    riesgo: filtrados.filter((r) => r.estado === 'EN_RIESGO').length,
+    nocumple: filtrados.filter((r) => r.estado === 'NO_CUMPLE').length,
   };
 
   return (
@@ -142,39 +153,119 @@ export default function Cumplimiento({ titulo = 'Reportes de Cumplimiento', comp
         </div>
       </div>
 
-      {/* Buscador de Fechas (Inputs de tipo fecha bajo el título) */}
-      <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase">
-          <Calendar size={16} className="text-blue-950" />
-          <span>Filtrar por Rango de Fechas:</span>
-        </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="flex items-center gap-2 flex-1 sm:flex-initial">
-            <label className="text-xs font-semibold text-slate-500">Desde:</label>
-            <input 
-              type="date" 
-              value={fechaInicio} 
-              onChange={(e) => setFechaInicio(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50/50 p-2 text-xs font-semibold text-slate-800 focus:border-blue-900 focus:outline-none" 
-            />
-          </div>
-          <div className="flex items-center gap-2 flex-1 sm:flex-initial">
-            <label className="text-xs font-semibold text-slate-500">Hasta:</label>
-            <input 
-              type="date" 
-              value={fechaFin} 
-              onChange={(e) => setFechaFin(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50/50 p-2 text-xs font-semibold text-slate-800 focus:border-blue-900 focus:outline-none" 
-            />
-          </div>
-          {(fechaInicio || fechaFin) && (
-            <button 
-              onClick={() => { setFechaInicio(''); setFechaFin(''); }} 
-              className="text-xs font-bold text-rose-600 hover:underline px-2 py-1 cursor-pointer"
+      {/* Barra de Filtros: Sector, Programa, Corte y Rango de Fechas */}
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+              Filtro por Sector
+            </label>
+            <select
+              value={sector}
+              onChange={(e) => setSector(e.target.value)}
+              className="w-full rounded-xl border border-slate-300 p-2 text-xs bg-slate-50 font-bold text-blue-950 focus:outline-none cursor-pointer"
             >
-              Limpiar
-            </button>
-          )}
+              <option value="Todos los Sectores">Todos los Sectores</option>
+              <option value="Sector Norte (Azul)">Sector Norte (Azul)</option>
+              <option value="Sector Sur (Verde)">Sector Sur (Verde)</option>
+              <option value="Sector Oriente (Rojo)">Sector Oriente (Rojo)</option>
+              <option value="SAPU / Urgencias">SAPU / Urgencias</option>
+              <option value="Transversal">Transversal</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+              Programa de Salud
+            </label>
+            <select
+              value={programa}
+              onChange={(e) => setPrograma(e.target.value)}
+              className="w-full rounded-xl border border-slate-300 p-2 text-xs bg-slate-50 font-bold text-slate-800 focus:outline-none cursor-pointer"
+            >
+              <option value="Todos los Programas">Todos los Programas</option>
+              <option value="Cardiovascular">Cardiovascular</option>
+              <option value="Salud Mental">Salud Mental</option>
+              <option value="Odontológico">Odontológico</option>
+              <option value="Niñez y Adolescencia">Niñez y Adolescencia</option>
+              <option value="Adulto y Persona Mayor">Adulto y Persona Mayor</option>
+              <option value="Salud Maternal y Reproductiva">Salud Maternal y Reproductiva</option>
+              <option value="Respiratorio (Asma/EPOC)">Respiratorio (Asma/EPOC)</option>
+              <option value="Salud Comunitaria">Salud Comunitaria</option>
+              <option value="Transversal">Transversal</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+              Corte Evaluativo
+            </label>
+            <select
+              value={corte}
+              onChange={(e) => setCorte(e.target.value)}
+              className="w-full rounded-xl border border-slate-300 p-2 text-xs bg-slate-50 font-semibold text-slate-800 focus:outline-none cursor-pointer"
+            >
+              {CORTES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+              Año Evaluativo
+            </label>
+            <select
+              value={anio}
+              onChange={(e) => setAnio(e.target.value)}
+              className="w-full rounded-xl border border-slate-300 p-2 text-xs bg-slate-50 font-semibold text-slate-800 focus:outline-none cursor-pointer"
+            >
+              <option value="2026">2026</option>
+              <option value="2025">2025</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Buscador de Fechas */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase">
+            <Calendar size={15} className="text-blue-950" />
+            <span>Rango de Fechas Opcional:</span>
+          </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="flex items-center gap-2 flex-1 sm:flex-initial">
+              <label className="text-xs font-semibold text-slate-500">Desde:</label>
+              <input 
+                type="date" 
+                value={fechaInicio} 
+                onChange={(e) => setFechaInicio(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-slate-50/50 p-1.5 text-xs font-semibold text-slate-800 focus:border-blue-900 focus:outline-none" 
+              />
+            </div>
+            <div className="flex items-center gap-2 flex-1 sm:flex-initial">
+              <label className="text-xs font-semibold text-slate-500">Hasta:</label>
+              <input 
+                type="date" 
+                value={fechaFin} 
+                onChange={(e) => setFechaFin(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-slate-50/50 p-1.5 text-xs font-semibold text-slate-800 focus:border-blue-900 focus:outline-none" 
+              />
+            </div>
+            {(fechaInicio || fechaFin || sector !== 'Todos los Sectores' || programa !== 'Todos los Programas' || corte) && (
+              <button 
+                onClick={() => { 
+                  setFechaInicio(''); 
+                  setFechaFin(''); 
+                  setSector('Todos los Sectores');
+                  setPrograma('Todos los Programas');
+                  setCorte('');
+                }} 
+                className="text-xs font-bold text-rose-600 hover:underline px-2 py-1 cursor-pointer"
+              >
+                Limpiar Filtros
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

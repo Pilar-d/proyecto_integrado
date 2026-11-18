@@ -57,7 +57,7 @@ export default function DisenoPrincipal() {
 
         {/* Módulos Filtrados por Rol */}
         <nav className="p-4 space-y-1.5 flex-1 overflow-y-auto">
-          {(userRole === 'Directora' || userRole === 'Subdireccion' || userRole === 'Gestor') && (
+          {(userRole === 'Directora' || userRole === 'Subdireccion' || userRole === 'Gestor' || userRole === 'JefePrograma' || userRole === 'Jefe de Programa') && (
             <Link 
               to="/dashboard" 
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition ${sidebarOpen ? 'justify-start' : 'justify-center'} ${location.pathname === '/dashboard' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}

@@ -1,12 +1,25 @@
-import React, { useState } from 'react';
-import { Users, UserPlus, Shield, CheckCircle2, XCircle, Key, Edit, Trash2, Monitor, Globe, Clock, X, Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  Users, UserPlus, Shield, CheckCircle2, XCircle, Edit, Trash2, 
+  Monitor, Globe, Clock, X, Search, RefreshCw, AlertTriangle 
+} from 'lucide-react';
+import api from '../api/axios';
 
-interface Usuario {
+interface RolItem {
+  id: number;
+  nombre_rol: string;
+  descripcion: string;
+}
+
+interface UsuarioUI {
   id: number;
   rut: string;
   nombre: string;
+  nombres: string;
+  apellidos: string;
   correo: string;
   rol: string;
+  rol_id: number;
   estado: 'Activo' | 'Inactivo';
   ultimoAcceso: string;
   ip: string;
@@ -14,12 +27,11 @@ interface Usuario {
 }
 
 export default function GestionUsuarios() {
-  const [usuarios, setUsuarios] = useState<Usuario[]>([
-    { id: 1, rut: '11111111-1', nombre: 'Dra. Carmen Valdés', correo: 'carmen.valdes@salud.cl', rol: 'Directora', estado: 'Activo', ultimoAcceso: '2026-10-17 08:30', ip: '190.160.20.15', dispositivo: 'MacBook Pro / Chrome' },
-    { id: 2, rut: '22222222-2', nombre: 'Mg. Roberto Soto', correo: 'roberto.soto@salud.cl', rol: 'Subdireccion', estado: 'Activo', ultimoAcceso: '2026-10-16 17:45', ip: '190.160.20.42', dispositivo: 'Windows 11 / Edge' },
-    { id: 3, rut: '33333333-3', nombre: 'Dr. Esteban Tapia', correo: 'esteban.tapia@salud.cl', rol: 'Gestor', estado: 'Activo', ultimoAcceso: '2026-10-17 09:10', ip: '200.14.88.5', dispositivo: 'MacBook Pro / Safari' },
-    { id: 4, rut: '44444444-4', nombre: 'Enf. Marcela Riquelme', correo: 'marcela.riquelme@salud.cl', rol: 'JefePrograma', estado: 'Inactivo', ultimoAcceso: '2026-09-28 14:20', ip: '190.160.21.88', dispositivo: 'Windows 10 / Chrome' },
-  ]);
+  const [usuarios, setUsuarios] = useState<UsuarioUI[]>([]);
+  const [roles, setRoles] = useState<RolItem[]>([]);
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState('');
+  const [mensajeExito, setMensajeExito] = useState('');
 
   // Estados de búsqueda y filtros
   const [busquedaTexto, setBusquedaTexto] = useState('');
@@ -38,19 +50,69 @@ export default function GestionUsuarios() {
   const [rol, setRol] = useState('Gestor');
   const [estado, setEstado] = useState<'Activo' | 'Inactivo'>('Activo');
   const [password, setPassword] = useState('');
+  const [guardando, setGuardando] = useState(false);
+
+  // Cargar usuarios y roles reales desde los endpoints del Backend
+  const cargarDatos = async () => {
+    setCargando(true);
+    setError('');
+    try {
+      const [resUsers, resRoles] = await Promise.all([
+        api.get('usuarios/'),
+        api.get('roles/')
+      ]);
+
+      if (resRoles.data) {
+        setRoles(resRoles.data);
+      }
+
+      if (resUsers.data) {
+        const formateados: UsuarioUI[] = resUsers.data.map((u: any) => ({
+          id: u.id,
+          rut: u.rut,
+          nombre: `${u.nombres || ''} ${u.apellidos || ''}`.trim() || u.username,
+          nombres: u.nombres || '',
+          apellidos: u.apellidos || '',
+          correo: u.email || u.correo || '',
+          rol: u.rol_detalle?.nombre_rol || 'Gestor',
+          rol_id: u.rol || 3,
+          estado: u.estado ? 'Activo' : 'Inactivo',
+          ultimoAcceso: u.last_login ? new Date(u.last_login).toLocaleString('es-CL') : 'Registrado recientemente',
+          ip: '127.0.0.1 (Local)',
+          dispositivo: 'Navegador Web / SES'
+        }));
+        setUsuarios(formateados);
+      }
+    } catch (err: any) {
+      console.error('Error al cargar usuarios o roles:', err);
+      if (err.response?.status === 403) {
+        setError('Acceso denegado: Se requieren privilegios de Gestor para administrar usuarios.');
+      } else {
+        setError('No se pudo conectar con el endpoint de usuarios en el servidor.');
+      }
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarDatos();
+  }, []);
 
   const abrirModalCrear = () => {
     setModoEdicion(false);
+    setUsuarioActualId(null);
     setRut('');
     setNombre('');
     setCorreo('');
     setRol('Gestor');
     setEstado('Activo');
     setPassword('');
+    setError('');
     setModalAbierto(true);
   };
 
-  const abrirModalEditar = (user: Usuario) => {
+  const abrirModalEditar = (user: UsuarioUI) => {
     setModoEdicion(true);
     setUsuarioActualId(user.id);
     setRut(user.rut);
@@ -59,45 +121,97 @@ export default function GestionUsuarios() {
     setRol(user.rol);
     setEstado(user.estado);
     setPassword('');
+    setError('');
     setModalAbierto(true);
   };
 
-  const handleGuardarUsuario = (e: React.FormEvent) => {
+  const handleGuardarUsuario = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (modoEdicion && usuarioActualId !== null) {
-      setUsuarios(usuarios.map(u => u.id === usuarioActualId ? { ...u, rut, nombre, correo, rol, estado } : u));
-      alert('Usuario actualizado correctamente.');
-    } else {
-      const nuevoUser: Usuario = {
-        id: usuarios.length + 1,
-        rut,
-        nombre,
-        correo,
-        rol,
-        estado,
-        ultimoAcceso: 'Sin registros',
-        ip: 'Registrada en 1er login',
-        dispositivo: 'Pendiente de conexión'
-      };
-      setUsuarios([...usuarios, nuevoUser]);
-      alert('Nuevo usuario incorporado exitosamente.');
-    }
-    setModalAbierto(false);
-  };
+    setGuardando(true);
+    setError('');
 
-  const toggleEstadoUsuario = (id: number) => {
-    setUsuarios(usuarios.map(u => {
-      if (u.id === id) {
-        const nuevoEstado = u.estado === 'Activo' ? 'Inactivo' : 'Activo';
-        return { ...u, estado: nuevoEstado };
+    // Separar nombres y apellidos
+    const partes = nombre.trim().split(' ');
+    const nombres = partes[0] || nombre;
+    const apellidos = partes.slice(1).join(' ') || '.';
+
+    // Obtener ID del rol seleccionado
+    const rolEncontrado = roles.find(r => r.nombre_rol.toLowerCase() === rol.toLowerCase());
+    const rol_id = rolEncontrado ? rolEncontrado.id : 3;
+
+    try {
+      if (modoEdicion && usuarioActualId !== null) {
+        const payload: any = {
+          rut,
+          nombres,
+          apellidos,
+          email: correo,
+          rol: rol_id,
+          estado: estado === 'Activo'
+        };
+        if (password.trim() !== '') {
+          payload.password = password;
+        }
+
+        await api.patch(`usuarios/${usuarioActualId}/`, payload);
+        setMensajeExito(`Usuario '${nombres} ${apellidos}' actualizado correctamente.`);
+      } else {
+        const payload: any = {
+          rut,
+          nombres,
+          apellidos,
+          email: correo,
+          rol: rol_id,
+          estado: estado === 'Activo',
+          password: password || 'cesfam2026'
+        };
+
+        await api.post('usuarios/', payload);
+        setMensajeExito(`Nuevo usuario '${nombres} ${apellidos}' incorporado a PostgreSQL.`);
       }
-      return u;
-    }));
+
+      setModalAbierto(false);
+      cargarDatos();
+      setTimeout(() => setMensajeExito(''), 4000);
+    } catch (err: any) {
+      console.error('Error al guardar usuario:', err);
+      const data = err.response?.data;
+      if (data) {
+        const msgs = Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(' | ');
+        setError(`Error del servidor: ${msgs}`);
+      } else {
+        setError('Error al procesar la solicitud en el endpoint de usuarios.');
+      }
+    } finally {
+      setGuardando(false);
+    }
   };
 
-  const eliminarUsuario = (id: number) => {
-    if (confirm('¿Está seguro de eliminar permanentemente a este usuario del sistema?')) {
-      setUsuarios(usuarios.filter(u => u.id !== id));
+  const toggleEstadoUsuario = async (user: UsuarioUI) => {
+    const nuevoEstadoBool = user.estado !== 'Activo';
+    try {
+      await api.patch(`usuarios/${user.id}/`, { estado: nuevoEstadoBool });
+      setUsuarios(prev => prev.map(u => u.id === user.id ? { ...u, estado: nuevoEstadoBool ? 'Activo' : 'Inactivo' } : u));
+    } catch (err) {
+      console.error('Error al alternar estado:', err);
+      alert('No se pudo cambiar el estado del usuario.');
+    }
+  };
+
+  const eliminarUsuario = async (user: UsuarioUI) => {
+    if (!confirm(`¿Está seguro de eliminar permanentemente a '${user.nombre}' (${user.rut}) de la base de datos?`)) {
+      return;
+    }
+
+    try {
+      await api.delete(`usuarios/${user.id}/`);
+      setUsuarios(prev => prev.map(u => u.id).filter(id => id !== user.id).map(id => usuarios.find(u => u.id === id)!));
+      setMensajeExito(`Usuario '${user.nombre}' eliminado de la base de datos.`);
+      cargarDatos();
+      setTimeout(() => setMensajeExito(''), 4000);
+    } catch (err) {
+      console.error('Error al eliminar usuario:', err);
+      alert('Error al intentar eliminar el usuario.');
     }
   };
 
@@ -112,22 +226,51 @@ export default function GestionUsuarios() {
   return (
     <div className="w-full min-h-full bg-slate-50 p-6 md:p-8 space-y-6">
       
-      {/* Cabecera del Módulo Centrada y sin icono */}
+      {/* Cabecera del Módulo */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center text-center space-y-3">
         <div className="space-y-1 max-w-2xl">
-          <h3 className="text-xl font-black text-blue-950">Gestión de Usuarios y Roles Institucionales</h3>
+          <div className="flex items-center justify-center gap-2">
+            <h3 className="text-xl font-black text-blue-950">Gestión de Usuarios y Roles Institucionales</h3>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+              PostgreSQL
+            </span>
+          </div>
           <p className="text-sm font-medium text-slate-500">
-            Control de accesos, suspensión de cuentas, asignación de roles y auditoría de dispositivos de conexión.
+            Control de accesos RBAC, suspensión de cuentas, asignación de roles y persistencia directa en base de datos.
           </p>
         </div>
-        <button 
-          onClick={abrirModalCrear}
-          style={{ backgroundColor: '#2e6b46' }}
-          className="flex items-center gap-2 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-md hover:opacity-95 transition cursor-pointer mt-2"
-        >
-          <UserPlus size={16} /> Nuevo Usuario
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={abrirModalCrear}
+            style={{ backgroundColor: '#2e6b46' }}
+            className="flex items-center gap-2 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-md hover:opacity-95 transition cursor-pointer"
+          >
+            <UserPlus size={16} /> Nuevo Usuario
+          </button>
+          <button
+            onClick={cargarDatos}
+            className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+            title="Refrescar datos desde endpoint"
+          >
+            <RefreshCw size={16} className={cargando ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
+
+      {/* Alertas */}
+      {mensajeExito && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 px-4 py-3 rounded-2xl flex items-center gap-2 text-xs font-bold shadow-sm">
+          <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+          <span>{mensajeExito}</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-900 px-4 py-3 rounded-2xl flex items-center gap-2 text-xs font-bold shadow-sm">
+          <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Barra de Búsqueda y Filtros */}
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -152,10 +295,9 @@ export default function GestionUsuarios() {
             className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-sm font-semibold text-slate-800 focus:outline-none"
           >
             <option value="Todos">Todos los Roles</option>
-            <option value="Directora">Directora</option>
-            <option value="Subdireccion">Subdirección</option>
-            <option value="Gestor">Gestor</option>
-            <option value="JefePrograma">Jefe de Programa</option>
+            {roles.map(r => (
+              <option key={r.id} value={r.nombre_rol}>{r.nombre_rol}</option>
+            ))}
           </select>
         </div>
 
@@ -183,12 +325,18 @@ export default function GestionUsuarios() {
               <th className="py-3 px-4">Correo Institucional</th>
               <th className="py-3 px-4">Rol Asignado</th>
               <th className="py-3 px-4 text-center">Estado de Acceso</th>
-              <th className="py-3 px-4">Control de Sesión (IP / Dispositivo)</th>
+              <th className="py-3 px-4">Control de Sesión</th>
               <th className="py-3 px-4 rounded-r-xl text-center">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
-            {usuariosFiltrados.length > 0 ? (
+            {cargando ? (
+              <tr>
+                <td colSpan={6} className="py-8 text-center text-sm font-semibold text-slate-400">
+                  Cargando usuarios desde PostgreSQL...
+                </td>
+              </tr>
+            ) : usuariosFiltrados.length > 0 ? (
               usuariosFiltrados.map((u) => (
                 <tr key={u.id} className="hover:bg-slate-50/80 transition">
                   <td className="py-4 px-4">
@@ -203,7 +351,7 @@ export default function GestionUsuarios() {
                   </td>
                   <td className="py-4 px-4 text-center">
                     <button 
-                      onClick={() => toggleEstadoUsuario(u.id)}
+                      onClick={() => toggleEstadoUsuario(u)}
                       className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer border ${
                         u.estado === 'Activo' 
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
@@ -230,7 +378,7 @@ export default function GestionUsuarios() {
                         <Edit size={16} />
                       </button>
                       <button 
-                        onClick={() => eliminarUsuario(u.id)}
+                        onClick={() => eliminarUsuario(u)}
                         className="p-2 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-xl transition cursor-pointer"
                         title="Eliminar usuario"
                       >
@@ -311,10 +459,9 @@ export default function GestionUsuarios() {
                     onChange={(e) => setRol(e.target.value)} 
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-900 focus:outline-none"
                   >
-                    <option value="Directora">Directora</option>
-                    <option value="Subdireccion">Subdirección</option>
-                    <option value="Gestor">Gestor</option>
-                    <option value="JefePrograma">Jefe de Programa</option>
+                    {roles.map(r => (
+                      <option key={r.id} value={r.nombre_rol}>{r.nombre_rol}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -332,7 +479,7 @@ export default function GestionUsuarios() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  {modoEdicion ? 'Nueva Contraseña (Opcional)' : 'Contraseña Temporal'}
+                  {modoEdicion ? 'Nueva Contraseña (Dejar vacío para no cambiar)' : 'Contraseña Temporal'}
                 </label>
                 <input 
                   type="password" 
@@ -354,10 +501,11 @@ export default function GestionUsuarios() {
                 </button>
                 <button 
                   type="submit" 
+                  disabled={guardando}
                   style={{ backgroundColor: '#2e6b46' }}
-                  className="px-6 py-2.5 rounded-xl text-white font-bold text-xs shadow-md hover:opacity-95 transition cursor-pointer"
+                  className="px-6 py-2.5 rounded-xl text-white font-bold text-xs shadow-md hover:opacity-95 transition cursor-pointer disabled:opacity-50"
                 >
-                  {modoEdicion ? 'Guardar Cambios' : 'Registrar Usuario'}
+                  {guardando ? 'Guardando...' : modoEdicion ? 'Guardar Cambios' : 'Registrar Usuario'}
                 </button>
               </div>
             </form>

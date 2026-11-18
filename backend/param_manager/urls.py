@@ -11,7 +11,12 @@ from .views import (
 
 from django.urls import path
 
-from .views import CalculoIndicadoresView, EstadoRemView, PoblacionParametrizacionView
+from .views import (
+    CalculoIndicadoresView,
+    EstadoRemView,
+    PoblacionParametrizacionView,
+    ParametrizarMetasCeldasView,
+)
 
 router = DefaultRouter()
 router.register('programas', ProgramaViewSet, basename='programa')
@@ -24,4 +29,5 @@ urlpatterns = [
     path('calc/', CalculoIndicadoresView.as_view(), name='calculo'),
     path('estado-rem/', EstadoRemView.as_view(), name='estado-rem'),
     path('poblacion/', PoblacionParametrizacionView.as_view(), name='poblacion'),
+    path('parametrizar-metas-celdas/', ParametrizarMetasCeldasView.as_view(), name='parametrizar-metas-celdas'),
 ] + router.urls

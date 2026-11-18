@@ -36,12 +36,24 @@ class UsuarioSerializer(serializers.ModelSerializer):
             "password",
             ]
         extra_kwargs = {
-            "password": {"write_only":True} #esto para evitar exponer la clave en el JSON
+            "password": {"write_only": True, "required": False} # Evita exponer la clave y permite actualizar sin reingresarla
         }
+
     def create(self, validated_data):
-        password = validated_data.pop("password")
+        password = validated_data.pop("password", None)
         validated_data["username"] = validated_data["rut"]
-        return Usuario.objects.create_user(password = password, **validated_data)
+        return Usuario.objects.create_user(password=password, **validated_data)
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop("password", None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if password:
+            instance.set_password(password)
+        if "rut" in validated_data:
+            instance.username = validated_data["rut"]
+        instance.save()
+        return instance
 
 class SectorSerializer(serializers.ModelSerializer):
     class Meta:

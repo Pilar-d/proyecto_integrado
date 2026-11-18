@@ -18,6 +18,21 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return token ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
+// Componente para restringir rutas según rol (RBAC Frontend)
+function RutaProtegidaPorRol({ 
+  rolesPermitidos, 
+  children 
+}: { 
+  rolesPermitidos: string[]; 
+  children: React.ReactNode 
+}) {
+  const userRole = localStorage.getItem('user_role') || '';
+  if (!rolesPermitidos.includes(userRole)) {
+    return <Navigate to={userRole === 'JefePrograma' || userRole === 'Jefe de Programa' ? "/reportes" : "/dashboard"} replace />;
+  }
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -26,15 +41,39 @@ export default function App() {
         <Route path="/recuperar-password" element={<RecuperarPassword />} />
         <Route path="/" element={<PrivateRoute><DisenoPrincipal /></PrivateRoute>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<Cumplimiento titulo="Dashboard de Cumplimiento de Metas" />} />
+          <Route path="dashboard" element={
+            <RutaProtegidaPorRol rolesPermitidos={['Directora', 'Subdireccion', 'Gestor', 'JefePrograma', 'Jefe de Programa']}>
+              <Cumplimiento titulo="Dashboard General de Metas" />
+            </RutaProtegidaPorRol>
+          } />
           <Route path="cumplimiento" element={<Cumplimiento />} />
-          <Route path="usuarios" element={<GestionUsuarios />} />
-          <Route path="admin-rem" element={<CargaYParametrizacionRem />} />
-          <Route path="audit" element={<BitacoraAuditoria />} />
+          <Route path="usuarios" element={
+            <RutaProtegidaPorRol rolesPermitidos={['Gestor']}>
+              <GestionUsuarios />
+            </RutaProtegidaPorRol>
+          } />
+          <Route path="admin-rem" element={
+            <RutaProtegidaPorRol rolesPermitidos={['Subdireccion', 'Gestor']}>
+              <CargaYParametrizacionRem />
+            </RutaProtegidaPorRol>
+          } />
+          <Route path="audit" element={
+            <RutaProtegidaPorRol rolesPermitidos={['Gestor']}>
+              <BitacoraAuditoria />
+            </RutaProtegidaPorRol>
+          } />
           <Route path="reportes" element={<ReportesDirectora />} />
           <Route path="configuracion-cuenta" element={<ConfiguracionCuenta />} />
-          <Route path="estado-datos" element={<EstadoDatos />} />
-          <Route path="historico" element={<ReporteHistorico />} />
+          <Route path="estado-datos" element={
+            <RutaProtegidaPorRol rolesPermitidos={['Subdireccion', 'Gestor']}>
+              <EstadoDatos />
+            </RutaProtegidaPorRol>
+          } />
+          <Route path="historico" element={
+            <RutaProtegidaPorRol rolesPermitidos={['Directora', 'Subdireccion', 'Gestor']}>
+              <ReporteHistorico />
+            </RutaProtegidaPorRol>
+          } />
         </Route>
 
         <Route path="*" element={<Navigate to="/login" replace />} />
