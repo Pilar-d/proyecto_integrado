@@ -1,4 +1,4 @@
-# CESFAM Santa Rosa — Plataforma Unificada (Monorepo)
+# CESFAM Santa Rosa
 
 Este repositorio unifica el backend (**Django REST Framework** proveniente de `gms-cesfam`) y el frontend (**React 19 + Vite + TypeScript + Tailwind CSS** proveniente de `proyecto-integrado`) en una arquitectura de monorepo limpia y desacoplada.
 
