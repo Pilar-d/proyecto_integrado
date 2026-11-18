@@ -22,10 +22,53 @@ class RemUploadView(APIView):
         if not file_obj:
             return Response({"error": "No se ha seleccionado ningún archivo REM."}, status=400)
 
-        periodo_mes = request.data.get('periodo_mes')
-        periodo_year = request.data.get('periodo_year', 2026)
-
         nombre = file_obj.name.lower()
+        # 1. Validación de extensión permitida (RF-03)
+        if not (nombre.endswith('.xlsx') or nombre.endswith('.xlsm') or nombre.endswith('.xls')):
+            return Response({
+                "error": f"Formato no admitido ('{file_obj.name}'). Solo se aceptan planillas oficiales de Excel (.xlsx, .xlsm, .xls)."
+            }, status=400)
+
+        # 2. Validación de tamaño máximo (50 MB)
+        if file_obj.size > 50 * 1024 * 1024:
+            return Response({
+                "error": "El archivo excede el tamaño máximo permitido de 50 MB."
+            }, status=400)
+
+        # 3. Validación de integridad de estructura Excel y lectura de hojas
+        try:
+            wb = openpyxl.load_workbook(file_obj, read_only=True, data_only=True)
+            sheet_names = wb.sheetnames
+            hojas_count = len(sheet_names)
+            wb.close()
+        except Exception as e:
+            return Response({
+                "error": f"El archivo Excel está dañado o tiene un formato no válido: {str(e)}"
+            }, status=400)
+
+        # 4. Validación de estructura oficial REM Serie A (MINSAL)
+        # Comprobar si contiene hojas oficiales de Serie A (ej: NOMBRE, A01, A02, A03, A04, etc.)
+        tiene_hojas_serie_a = any(
+            s.upper().startswith('A') or s.upper() == 'NOMBRE' or s.upper().startswith('P')
+            for s in sheet_names
+        )
+        if not tiene_hojas_serie_a:
+            return Response({
+                "error": "La planilla cargada no corresponde a la estructura oficial del REM Serie A (no contiene hojas A01, A02, A03...)."
+            }, status=400)
+
+        # 5. Determinación y validación del período (Mes y Año)
+        import json
+        params_dict = {}
+        if request.data.get('parametros'):
+            try:
+                params_dict = json.loads(request.data.get('parametros'))
+            except Exception:
+                pass
+
+        periodo_mes = request.data.get('periodo_mes') or params_dict.get('periodo_mes')
+        periodo_year = request.data.get('periodo_year') or params_dict.get('periodo_year', 2026)
+
         if not periodo_mes:
             if 'enero' in nombre or ' 1 ' in nombre or 'serie a enero' in nombre:
                 periodo_mes = 1
@@ -54,16 +97,23 @@ class RemUploadView(APIView):
             else:
                 periodo_mes = 1
 
-        periodo_mes = int(periodo_mes)
-        periodo_year = int(periodo_year)
+        try:
+            periodo_mes = int(periodo_mes)
+            periodo_year = int(periodo_year)
+            if not (1 <= periodo_mes <= 12):
+                periodo_mes = 1
+        except (ValueError, TypeError):
+            periodo_mes = 1
+            periodo_year = 2026
 
-        # Marcar anteriores como reemplazados
+        # 6. Marcar versiones anteriores del mismo período como REEMPLAZADO
         RemArchivo.objects.filter(
             periodo_mes=periodo_mes,
             periodo_year=periodo_year,
             estado=RemArchivo.Estado.VALIDO
         ).update(estado=RemArchivo.Estado.REEMPLAZADO)
 
+        # 7. Crear el registro válido
         rem_archivo = RemArchivo.objects.create(
             usuario=request.user,
             archivo=file_obj,
@@ -71,22 +121,15 @@ class RemUploadView(APIView):
             periodo_mes=periodo_mes,
             periodo_year=periodo_year,
             establecimiento='CESFAM Santa Rosa (210450)',
+            hojas_rem=hojas_count,
             estado=RemArchivo.Estado.VALIDO
         )
 
-        try:
-            wb = openpyxl.load_workbook(rem_archivo.archivo.path, read_only=True)
-            rem_archivo.hojas_rem = len(wb.sheetnames)
-            rem_archivo.save()
-            wb.close()
-        except Exception:
-            pass
-
-        # Registrar en auditoría (RF-12)
+        # 8. Registrar en auditoría (RF-12)
         try:
             rol = getattr(getattr(request.user, 'rol', None), 'nombre_rol', 'Gestor')
             Registros.objects.create(
-                usuario=request.user,
+                usuario=request.user if request.user.is_authenticated else None,
                 accion='CARGA_REM',
                 rol_usuario=rol,
                 tabla_afectada='RemArchivo',
@@ -94,7 +137,9 @@ class RemUploadView(APIView):
                     'archivo': file_obj.name,
                     'mes': periodo_mes,
                     'year': periodo_year,
-                    'hojas': rem_archivo.hojas_rem
+                    'hojas': hojas_count,
+                    'establecimiento': rem_archivo.establecimiento,
+                    'estado': 'VALIDO'
                 },
                 ip_origen=request.META.get('REMOTE_ADDR', '127.0.0.1')
             )
@@ -103,11 +148,12 @@ class RemUploadView(APIView):
 
         return Response({
             "status": "success",
-            "message": f"Planilla REM '{file_obj.name}' procesada exitosamente.",
+            "message": f"Planilla REM '{file_obj.name}' validada y procesada exitosamente.",
             "filename": file_obj.name,
-            "periodo": f"{periodo_mes}/{periodo_year}",
-            "hojas": rem_archivo.hojas_rem,
+            "periodo": f"{periodo_mes:02d}/{periodo_year}",
+            "hojas": hojas_count,
             "establecimiento": rem_archivo.establecimiento,
+            "estado": "VALIDO"
         })
 
 
