@@ -44,6 +44,18 @@ class EsGestorOSubdireccion(BasePermission):
         return False
 
 
+class EsDirectoraOGestorOSubdireccion(BasePermission):
+    """Permite acceso a Directora, Subdirección y Gestor (auditoría y control de gestión)."""
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        if user.is_superuser:
+            return True
+        return nombre_rol(user) in (ROL_GESTOR, ROL_SUBDIRECCION, ROL_DIRECTORA)
+
+
 class EsConsultaOGestorOSubdireccion(BasePermission):
     """Consulta para todos los roles; escritura solo para Gestor y Subdirección."""
 

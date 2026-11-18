@@ -54,12 +54,12 @@ export default function App() {
             </RutaProtegidaPorRol>
           } />
           <Route path="admin-rem" element={
-            <RutaProtegidaPorRol rolesPermitidos={['Subdireccion', 'Gestor']}>
+            <RutaProtegidaPorRol rolesPermitidos={['Subdireccion', 'Gestor', 'Directora']}>
               <CargaYParametrizacionRem />
             </RutaProtegidaPorRol>
           } />
           <Route path="audit" element={
-            <RutaProtegidaPorRol rolesPermitidos={['Gestor']}>
+            <RutaProtegidaPorRol rolesPermitidos={['Gestor', 'Directora', 'Subdireccion']}>
               <BitacoraAuditoria />
             </RutaProtegidaPorRol>
           } />

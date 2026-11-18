@@ -34,6 +34,7 @@ from rest_framework.permissions import IsAuthenticated
 from .permissions import (
     EsGestor,
     EsGestorOSubdireccion,
+    EsDirectoraOGestorOSubdireccion,
     EsConsultaOGestorOSubdireccion,
     EsRolConsulta,
 )
@@ -98,7 +99,7 @@ class RegistrosViewSet(
     ):
     queryset = Registros.objects.all().order_by("-fecha_hora").select_related("usuario")
     serializer_class = RegistrosSerializer
-    permission_classes = [IsAuthenticated, EsGestor]
+    permission_classes = [IsAuthenticated, EsDirectoraOGestorOSubdireccion]
 
 #vista para la autenticación JWT del login
 

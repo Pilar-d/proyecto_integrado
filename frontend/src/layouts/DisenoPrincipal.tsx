@@ -67,7 +67,7 @@ export default function DisenoPrincipal() {
             </Link>
           )}
 
-          {(userRole === 'Subdireccion' || userRole === 'Gestor') && (
+          {(userRole === 'Subdireccion' || userRole === 'Gestor' || userRole === 'Directora') && (
             <Link 
               to="/admin-rem" 
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition ${sidebarOpen ? 'justify-start' : 'justify-center'} ${location.pathname === '/admin-rem' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
@@ -116,7 +116,7 @@ export default function DisenoPrincipal() {
           )}
           
 
-          {userRole === 'Gestor' && (
+          {(userRole === 'Gestor' || userRole === 'Directora' || userRole === 'Subdireccion') && (
             <Link 
               to="/audit" 
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition ${sidebarOpen ? 'justify-start' : 'justify-center'} ${location.pathname === '/audit' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
