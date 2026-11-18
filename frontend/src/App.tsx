@@ -7,6 +7,7 @@ import GestionUsuarios from './pages/GestionUsuarios';
 import CargaYParametrizacionRem from './pages/CargaYParametrizacionRem';
 import BitacoraAuditoria from './pages/BitacoraAuditoria';
 import Cumplimiento from './pages/Cumplimiento';
+import DashboardDirectora from './pages/DashboardDirectora';
 import ReportesDirectora from './pages/ReportesDirectora';
 import ConfiguracionCuenta from './pages/ConfiguracionCuenta';
 import EstadoDatos from './pages/EstadoDatos';
@@ -43,7 +44,7 @@ export default function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={
             <RutaProtegidaPorRol rolesPermitidos={['Directora', 'Subdireccion', 'Gestor', 'JefePrograma', 'Jefe de Programa']}>
-              <Cumplimiento titulo="Dashboard General de Metas" />
+              <DashboardDirectora />
             </RutaProtegidaPorRol>
           } />
           <Route path="cumplimiento" element={<Cumplimiento />} />

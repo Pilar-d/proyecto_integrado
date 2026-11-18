@@ -73,11 +73,21 @@ class LibrosREM:
 
     def leer_celda_simple(self, libro, hoja, referencia):
         """Lee una celda (D11) o suma un rango (H11:X11)."""
-        if hoja not in libro.sheetnames:
+        target_sheet = None
+        if hoja in libro.sheetnames:
+            target_sheet = hoja
+        else:
+            limpia = hoja.replace('REM', '').replace('rem', '').replace('_', '').strip()
+            for s in libro.sheetnames:
+                if s.strip().upper() == limpia.upper() or s.strip().upper() == hoja.strip().upper():
+                    target_sheet = s
+                    break
+
+        if not target_sheet:
             raise MotorCalculoError(
                 f'La hoja "{hoja}" no existe en la planilla.'
             )
-        hoja_ws = libro[hoja]
+        hoja_ws = libro[target_sheet]
         if ':' in referencia:
             try:
                 total = Decimal('0')
