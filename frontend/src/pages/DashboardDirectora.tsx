@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Download, CheckCircle, AlertTriangle, TrendingUp, TrendingDown, 
   BarChart2, BarChart3, Activity, ShieldCheck, PieChart, LineChart, Search, 
   RefreshCw, Calendar, Filter, Layers, Info, Minus, AlertCircle, 
   ArrowUpRight, Award 
 } from 'lucide-react';
-import api from '../api/axios';
+import { useCalculoIndicadoresQuery } from '../api/queries';
 import ModalDetalleIndicador from '../components/ModalDetalleIndicador';
 
 interface ResultadoCalc {
@@ -54,41 +54,23 @@ export default function DashboardDirectora() {
   const [fechaFin, setFechaFin] = useState('');
   const [busqueda, setBusqueda] = useState('');
 
-  // Datos de indicadores y cálculo
-  const [resultados, setResultados] = useState<ResultadoCalc[]>([]);
-  const [mesesConDatos, setMesesConDatos] = useState(12);
-  const [cargando, setCargando] = useState(false);
-  const [error, setError] = useState('');
+  // Consumo de datos reactivo con TanStack Query
+  const { 
+    data: calcData, 
+    isLoading: cargando, 
+    isError, 
+    refetch: cargarDatos, 
+    isFetching 
+  } = useCalculoIndicadoresQuery({
+    anio,
+    corte,
+    sector: area,
+  });
+
+  const resultados: ResultadoCalc[] = calcData?.resultados || [];
+  const mesesConDatos = calcData?.hasta_mes || 12;
+  const error = isError ? 'No se pudo conectar con el servidor de cálculo. Verifique la base de datos PostgreSQL.' : '';
   const [indicadorModal, setIndicadorModal] = useState<ResultadoCalc | null>(null);
-
-  // Consulta al backend oficial de Django/PostgreSQL
-  const cargarDatos = async () => {
-    setCargando(true);
-    setError('');
-    try {
-      const res = await api.get('param/calc/', {
-        params: {
-          anio,
-          ...(corte ? { corte } : {}),
-          ...(area !== 'Todos los Sectores' ? { sector: area } : {}),
-          ...(fechaInicio ? { fecha_inicio: fechaInicio } : {}),
-          ...(fechaFin ? { fecha_fin: fechaFin } : {}),
-        }
-      });
-      setResultados(res.data.resultados || []);
-      setMesesConDatos(res.data.hasta_mes || 12);
-    } catch (err: any) {
-      console.error('Error al cargar datos del dashboard de Dirección:', err);
-      setError('No se pudo conectar con el servidor de cálculo. Verifique la base de datos PostgreSQL.');
-    } finally {
-      setCargando(false);
-    }
-  };
-
-  useEffect(() => {
-    cargarDatos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anio, corte, area, fechaInicio, fechaFin]);
 
   // ==========================================
   // CÁLCULOS DEL SEMÁFORO CON DATOS REALES
@@ -268,12 +250,12 @@ export default function DashboardDirectora() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={cargarDatos}
-            disabled={cargando}
+            onClick={() => cargarDatos()}
+            disabled={cargando || isFetching}
             className="flex items-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200 px-4 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer"
             title="Recalcular desde PostgreSQL"
           >
-            <RefreshCw size={15} className={cargando ? 'animate-spin' : ''} />
+            <RefreshCw size={15} className={cargando || isFetching ? 'animate-spin' : ''} />
             Actualizar
           </button>
           <button 
@@ -284,6 +266,13 @@ export default function DashboardDirectora() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="p-4 rounded-2xl bg-rose-50 text-rose-800 border border-rose-200 text-sm font-semibold flex items-center gap-2">
+          <AlertCircle size={18} className="shrink-0 text-rose-600" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Barra de Filtros: Filtro por Área / Sector, Año y Corte */}
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3">

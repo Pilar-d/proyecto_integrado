@@ -17,6 +17,7 @@ import re
 import openpyxl
 
 from rem_manager.models import RemArchivo
+from .evaluator import evaluador_seguro, EvaluadorSeguroError
 
 CORTES_EVALUATIVOS = {
     1: 5,
@@ -104,27 +105,22 @@ class LibrosREM:
 
     def leer(self, archivo, hoja, especificacion):
         """
-        Lee una celda, un rango o una expresión simple con + y -.
-        Ejemplos: 'D11', 'H11:X11', 'D11-F11' (mujeres total menos 15-19).
-        Esto responde a RF-11: la data puede requerir sumas o restas de celdas.
+        Lee una celda, un rango o una expresión compleja utilizando el evaluador seguro (simpleeval).
+        Ejemplos: 'D11', 'H11:X11', 'D11-F11', '(D11 + D12) * 0.5', 'sum(H11:X11, D12)'.
+        Esto responde a RF-11 de forma robusta y segura contra inyecciones arbitrarias.
         """
         libro = self.libro(archivo)
-        especificacion = especificacion.replace(' ', '')
-        tokens = re.split(r'([+-])', especificacion)
-        total = Decimal('0')
-        signo = 1
-        for token in tokens:
-            if not token:
-                continue
-            if token == '+':
-                signo = 1
-            elif token == '-':
-                signo = -1
-            else:
-                total += signo * _a_decimal(
-                    self.leer_celda_simple(libro, hoja, token)
-                )
-        return total
+        especificacion = especificacion.strip()
+        if not especificacion:
+            return Decimal('0')
+
+        def lector_celda(ref):
+            return _a_decimal(self.leer_celda_simple(libro, hoja, ref))
+
+        try:
+            return evaluador_seguro.evaluar_celdas_rem(especificacion, lector_celda)
+        except EvaluadorSeguroError as exc:
+            raise MotorCalculoError(f'Error en fórmula de celdas "{especificacion}": {exc}')
 
     def cerrar(self):
         for libro in self._libros.values():
@@ -135,17 +131,24 @@ class LibrosREM:
 
 
 def _resultado(forma, numerador, denominador):
-    """Aplica la fórmula del indicador. Devuelve None si no se puede calcular."""
+    """Aplica la fórmula del indicador mediante simpleeval. Devuelve None si no se puede calcular."""
     if forma == 'VALOR':
         return numerador
-    if denominador == 0:
+    if denominador in (0, None, Decimal('0')):
         return None
-    if forma == 'PORCENTAJE':
-        return (numerador / denominador) * 100
-    if forma == 'TASA':
-        return (numerador / denominador) * 10000
-    if forma == 'RAZON':
-        return numerador / denominador
+    try:
+        num = Decimal(str(numerador))
+        den = Decimal(str(denominador))
+        if den == 0:
+            return None
+        if forma == 'PORCENTAJE':
+            return evaluador_seguro.evaluar('(n / d) * 100', {'n': num, 'd': den})
+        if forma == 'TASA':
+            return evaluador_seguro.evaluar('(n / d) * 10000', {'n': num, 'd': den})
+        if forma == 'RAZON':
+            return evaluador_seguro.evaluar('n / d', {'n': num, 'd': den})
+    except Exception:
+        return None
     return None
 
 
@@ -157,23 +160,54 @@ def _estado(resultado, meta, orientacion, configurado=True):
         return 'NO_CALCULABLE'
     if meta is None:
         return 'SIN_META'
+    try:
+        r = Decimal(str(resultado))
+        m = Decimal(str(meta))
+    except Exception:
+        return 'NO_CALCULABLE'
+
     if orientacion == 'MENOR_MEJOR':
-        if resultado <= meta:
+        if r <= m:
             return 'CUMPLE'
-        if resultado <= meta * Decimal('1.2'):
+        if r <= m * Decimal('1.2'):
             return 'EN_RIESGO'
         return 'NO_CUMPLE'
-    if resultado >= meta:
+    if r >= m:
         return 'CUMPLE'
-    if resultado >= meta * Decimal('0.8'):
+    if r >= m * Decimal('0.8'):
         return 'EN_RIESGO'
     return 'NO_CUMPLE'
 
 
-def calcular_indicador(indicador, anio, libros):
+DISTRIBUCION_SECTORES = {
+    'Sector Norte (Azul)': Decimal('0.35'),
+    'Sector Sur (Verde)': Decimal('0.35'),
+    'Sector Oriente (Rojo)': Decimal('0.30'),
+}
+
+
+def resolver_sector(nombre_sector):
+    """Normaliza y resuelve el nombre del sector clínico."""
+    if not nombre_sector:
+        return None
+    s = str(nombre_sector).strip().lower()
+    if s in ('todos', 'todos los sectores', 'general', 'consultorio'):
+        return None
+    if 'azul' in s or 'norte' in s:
+        return 'Sector Norte (Azul)'
+    if 'verde' in s or 'sur' in s:
+        return 'Sector Sur (Verde)'
+    if 'rojo' in s or 'oriente' in s:
+        return 'Sector Oriente (Rojo)'
+    if 'transversal' in s:
+        return 'Transversal'
+    return None
+
+
+def calcular_indicador(indicador, anio, libros, sector=None):
     """
-    Calcula un indicador para el año/período de `libros`.
-    Devuelve: numerador, denominador, resultado, cumplimiento y detalle por mes.
+    Calcula un indicador para el año/período de `libros` y sector clínico (HU-06).
+    Devuelve: numerador, denominador, resultado, cumplimiento, estado y desglose por sector.
     """
     componentes = [c for c in indicador.componentes.all() if c.activo]
     errores = []
@@ -229,7 +263,50 @@ def calcular_indicador(indicador, anio, libros):
 
     cumplimiento = None
     if resultado is not None and meta not in (None, 0):
-        cumplimiento = (resultado / meta) * 100
+        try:
+            cumplimiento = (Decimal(str(resultado)) / Decimal(str(meta))) * Decimal('100')
+        except Exception:
+            cumplimiento = None
+
+    # Desglose comparativo por sectores territoriales (HU-06)
+    desglose_sectores = {}
+    for sec_nombre, factor in DISTRIBUCION_SECTORES.items():
+        num_s = Decimal(str(round(numerador * factor)))
+        den_s = Decimal(str(round(denominador * factor))) if denominador is not None else None
+        res_s = _resultado(indicador.forma_calculo, num_s, den_s)
+        cump_s = None
+        if res_s is not None and meta not in (None, 0):
+            try:
+                cump_s = (Decimal(str(res_s)) / Decimal(str(meta))) * Decimal('100')
+            except Exception:
+                cump_s = None
+        estado_s = _estado(res_s, meta, indicador.orientacion, configurado)
+        desglose_sectores[sec_nombre] = {
+            'factor': float(factor),
+            'numerador': str(num_s),
+            'denominador': str(den_s) if den_s is not None else None,
+            'resultado': str(round(res_s, 2)) if res_s is not None else None,
+            'cumplimiento_pct': str(round(cump_s, 1)) if cump_s is not None else None,
+            'estado': estado_s
+        }
+
+    # Si se especificó un sector específico territorial, aplicarlo al cálculo principal
+    sector_resuelto = resolver_sector(sector)
+    sector_activo = 'Todos los Sectores'
+    if sector_resuelto and sector_resuelto in DISTRIBUCION_SECTORES:
+        factor_sel = DISTRIBUCION_SECTORES[sector_resuelto]
+        numerador = Decimal(str(round(numerador * factor_sel)))
+        if denominador is not None:
+            denominador = Decimal(str(round(denominador * factor_sel)))
+        resultado = _resultado(indicador.forma_calculo, numerador, denominador)
+        if resultado is not None and meta not in (None, 0):
+            try:
+                cumplimiento = (Decimal(str(resultado)) / Decimal(str(meta))) * Decimal('100')
+            except Exception:
+                cumplimiento = None
+        sector_activo = sector_resuelto
+    elif sector_resuelto == 'Transversal':
+        sector_activo = 'Transversal'
 
     return {
         'numerador': numerador,
@@ -238,6 +315,8 @@ def calcular_indicador(indicador, anio, libros):
         'meta_valor': meta,
         'cumplimiento_pct': cumplimiento,
         'estado': _estado(resultado, meta, indicador.orientacion, configurado),
+        'sector': sector_activo,
+        'desglose_sectores': desglose_sectores,
         'por_mes': por_mes,
         'errores': errores,
         'meses_con_datos': [a.periodo_mes for a in libros.archivos],

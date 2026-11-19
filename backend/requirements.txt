@@ -9,5 +9,6 @@ psycopg==3.3.6
 psycopg-binary==3.3.6
 PyJWT==2.15.1
 python-dotenv==1.2.4
+simpleeval==1.0.8
 sqlparse==0.6.0
 tzdata==2026.4

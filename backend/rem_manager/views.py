@@ -1,10 +1,12 @@
 # rem_manager/views.py
 import openpyxl
+import json
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from .models import RemArchivo
+from .validator import validar_archivo_rem
 from api.permissions import EsGestorOSubdireccion, EsRolConsulta
 from api.models import Registros
 
@@ -12,7 +14,7 @@ from api.models import Registros
 class RemUploadView(APIView):
     """
     Carga manual de planillas REM (RF-03).
-    Acepta archivos .xlsm / .xlsx oficiales MINSAL.
+    Acepta archivos .xlsm / .xlsx oficiales MINSAL con validación por celda, fila y columna.
     """
     permission_classes = [IsAuthenticated, EsGestorOSubdireccion]
     parser_classes = [MultiPartParser, FormParser]
@@ -22,43 +24,6 @@ class RemUploadView(APIView):
         if not file_obj:
             return Response({"error": "No se ha seleccionado ningún archivo REM."}, status=400)
 
-        nombre = file_obj.name.lower()
-        # 1. Validación de extensión permitida (RF-03)
-        if not (nombre.endswith('.xlsx') or nombre.endswith('.xlsm') or nombre.endswith('.xls')):
-            return Response({
-                "error": f"Formato no admitido ('{file_obj.name}'). Solo se aceptan planillas oficiales de Excel (.xlsx, .xlsm, .xls)."
-            }, status=400)
-
-        # 2. Validación de tamaño máximo (50 MB)
-        if file_obj.size > 50 * 1024 * 1024:
-            return Response({
-                "error": "El archivo excede el tamaño máximo permitido de 50 MB."
-            }, status=400)
-
-        # 3. Validación de integridad de estructura Excel y lectura de hojas
-        try:
-            wb = openpyxl.load_workbook(file_obj, read_only=True, data_only=True)
-            sheet_names = wb.sheetnames
-            hojas_count = len(sheet_names)
-            wb.close()
-        except Exception as e:
-            return Response({
-                "error": f"El archivo Excel está dañado o tiene un formato no válido: {str(e)}"
-            }, status=400)
-
-        # 4. Validación de estructura oficial REM Serie A (MINSAL)
-        # Comprobar si contiene hojas oficiales de Serie A (ej: NOMBRE, A01, A02, A03, A04, etc.)
-        tiene_hojas_serie_a = any(
-            s.upper().startswith('A') or s.upper() == 'NOMBRE' or s.upper().startswith('P')
-            for s in sheet_names
-        )
-        if not tiene_hojas_serie_a:
-            return Response({
-                "error": "La planilla cargada no corresponde a la estructura oficial del REM Serie A (no contiene hojas A01, A02, A03...)."
-            }, status=400)
-
-        # 5. Determinación y validación del período (Mes y Año)
-        import json
         params_dict = {}
         if request.data.get('parametros'):
             try:
@@ -66,6 +31,25 @@ class RemUploadView(APIView):
             except Exception:
                 pass
 
+        # 1. Validación integral de estructura, celdas, filas y columnas (RF-03)
+        file_obj.seek(0)
+        validacion = validar_archivo_rem(file_obj, params_dict)
+        file_obj.seek(0)
+
+        if not validacion['es_valido']:
+            return Response({
+                "status": "error",
+                "error": f"Se detectaron {validacion['total_errores']} errores en la planilla REM. Verifique las celdas, filas y columnas reportadas.",
+                "total_errores": validacion['total_errores'],
+                "errores_detalle": validacion['errores'],
+                "advertencias": validacion['advertencias'],
+                "filename": file_obj.name,
+            }, status=400)
+
+        nombre = file_obj.name.lower()
+        hojas_count = validacion['metadatos']['total_hojas']
+
+        # 2. Determinación y validación del período (Mes y Año)
         periodo_mes = request.data.get('periodo_mes') or params_dict.get('periodo_mes')
         periodo_year = request.data.get('periodo_year') or params_dict.get('periodo_year', 2026)
 
@@ -153,7 +137,9 @@ class RemUploadView(APIView):
             "periodo": f"{periodo_mes:02d}/{periodo_year}",
             "hojas": hojas_count,
             "establecimiento": rem_archivo.establecimiento,
-            "estado": "VALIDO"
+            "estado": "VALIDO",
+            "errores_detalle": [],
+            "advertencias": validacion.get('advertencias', [])
         })
 
 

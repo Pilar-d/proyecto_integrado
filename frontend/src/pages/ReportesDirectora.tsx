@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Filter, Download, TrendingUp, TrendingDown, CheckCircle, AlertTriangle, 
   Search, MessageSquare, Send, Calendar, User, BarChart3, Layers, Minus, 
-  Info, RefreshCw, FileSpreadsheet, CheckCircle2 
+  Info, RefreshCw 
 } from 'lucide-react';
 import api from '../api/axios';
 import ModalDetalleIndicador from '../components/ModalDetalleIndicador';
@@ -306,7 +306,7 @@ export default function ReportesDirectora() {
           <span>Filtros de Búsqueda y Segmentación Territorial</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           
           {/* 1. FILTRO POR SECTOR (Requisito Clave) */}
           <div>
@@ -340,10 +340,26 @@ export default function ReportesDirectora() {
             </select>
           </div>
 
-          {/* 3. AÑO Y CORTE EVALUATIVO */}
+          {/* 3. AÑO */}
           <div>
             <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-              Corte Evaluativo ({anio})
+              Año Evaluado
+            </label>
+            <select 
+              value={anio} 
+              onChange={(e) => setAnio(e.target.value)} 
+              className="w-full rounded-xl border border-slate-300 p-2.5 text-xs bg-slate-50 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-900 cursor-pointer"
+            >
+              <option value="2026">2026 (Vigente)</option>
+              <option value="2025">2025</option>
+              <option value="2024">2024</option>
+            </select>
+          </div>
+
+          {/* 4. CORTE EVALUATIVO */}
+          <div>
+            <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+              Corte Evaluativo
             </label>
             <select 
               value={corte} 
@@ -356,7 +372,7 @@ export default function ReportesDirectora() {
             </select>
           </div>
 
-          {/* 4. BUSCADOR RÁPIDO */}
+          {/* 5. BUSCADOR RÁPIDO */}
           <div>
             <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
               Búsqueda de Indicador

@@ -67,12 +67,41 @@ export default function ReporteHistorico() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
 
-  // Consulta de datos reales para ambos años desde PostgreSQL
+  // Consulta de datos reales para ambos años desde PostgreSQL (HU-07)
   const cargarComparativo = async () => {
     setCargando(true);
     setError('');
     try {
-      // 1. Obtener cálculo del año actual (2026)
+      // 1. Intentar consultar el endpoint dedicado del backend (HU-07 / RF-07)
+      try {
+        const resComp = await api.get('param/comparativo/', {
+          params: {
+            anio_base: anioBase,
+            anio_evaluacion: anioComparacion,
+            ...(area !== 'Todos los Sectores' ? { sector: area } : {}),
+            ...(programaFiltro !== 'Todos los Programas' ? { programa: programaFiltro } : {})
+          }
+        });
+        if (resComp.data && Array.isArray(resComp.data.resultados) && resComp.data.resultados.length > 0) {
+          const items: ItemComparativo[] = resComp.data.resultados.map((r: any) => ({
+            codigo: r.codigo,
+            nombre: r.nombre,
+            meta_codigo: r.meta_codigo,
+            seccion: r.seccion,
+            programa: r.programa || 'Transversal',
+            pctBase: r.pct_base,
+            pctActual: r.pct_evaluacion,
+            delta: r.delta,
+            estadoTendencia: r.tendencia as 'MEJORA' | 'DESCENSO' | 'ESTABLE'
+          }));
+          setItemsComparativos(items);
+          return;
+        }
+      } catch (e) {
+        console.warn('Endpoint comparativo directo no disponible, recurriendo a cálculo fallback:', e);
+      }
+
+      // 2. Fallback: Obtener cálculo del año actual y año base mediante param/calc/
       const resActual = await api.get('param/calc/', {
         params: {
           anio: anioComparacion,
@@ -82,7 +111,7 @@ export default function ReporteHistorico() {
       });
       const datosActuales: IndicadorCalc[] = resActual.data.resultados || [];
 
-      // 2. Intentar obtener cálculo del año base (2025)
+      // Obtener cálculo del año base (2025)
       let datosBaseMap: Record<string, number> = {};
       try {
         const resBase = await api.get('param/calc/', {

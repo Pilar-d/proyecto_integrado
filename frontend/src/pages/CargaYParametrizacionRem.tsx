@@ -5,6 +5,13 @@ import {
   Check, Info, Target, Search, Edit3, X, FileText
 } from 'lucide-react';
 import api from '../api/axios';
+import { 
+  useMetasYCeldasQuery, 
+  usePoblacionQuery, 
+  useMutacionParametrizarMeta, 
+  useMutacionPoblacion, 
+  useMutacionUploadRem 
+} from '../api/queries';
 
 interface DenominadorInfo {
   id: number;
@@ -40,6 +47,16 @@ interface IndicadorParamInfo {
   den_hoja: string;
   den_celda: string;
   den_descripcion: string;
+}
+
+interface DetalleErrorRem {
+  hoja: string;
+  fila: string | number;
+  columna: string;
+  celda: string;
+  tipo: string;
+  valor?: string;
+  mensaje: string;
 }
 
 export default function CargaYParametrizacionRem() {
@@ -85,12 +102,15 @@ export default function CargaYParametrizacionRem() {
   const [formMeta, setFormMeta] = useState({
     meta_valor: '',
     ponderacion: '',
+    forma_calculo: 'PORCENTAJE',
+    orientacion: 'MAYOR_MEJOR',
     num_hoja: '',
     num_celda: '',
     num_descripcion: ''
   });
   const [guardandoMeta, setGuardandoMeta] = useState(false);
   const [mensajeExitoMeta, setMensajeExitoMeta] = useState('');
+  const [mensajeErrorMeta, setMensajeErrorMeta] = useState('');
 
   // ==========================================
   // ESTADOS PESTAÑA 3: CARGA ARCHIVOS REM
@@ -99,6 +119,8 @@ export default function CargaYParametrizacionRem() {
   const [cargandoArchivo, setCargandoArchivo] = useState(false);
   const [resultadoArchivo, setResultadoArchivo] = useState<any>(null);
   const [errorArchivo, setErrorArchivo] = useState('');
+  const [erroresDetalle, setErroresDetalle] = useState<DetalleErrorRem[]>([]);
+  const [advertenciasDetalle, setAdvertenciasDetalle] = useState<DetalleErrorRem[]>([]);
 
   const [parametros, setParametros] = useState({
     hojaRem: 'REM A24',
@@ -107,6 +129,11 @@ export default function CargaYParametrizacionRem() {
     filaInicioDatos: 12,
     columnaIndicador: 'D'
   });
+
+  // Mutaciones de datos con TanStack Query
+  const mutacionMeta = useMutacionParametrizarMeta();
+  const mutacionPoblacion = useMutacionPoblacion();
+  const mutacionUploadRem = useMutacionUploadRem();
 
   // Cargar datos de población y denominadores
   const cargarPoblacion = async (anio: string) => {
@@ -178,13 +205,13 @@ export default function CargaYParametrizacionRem() {
     setExitoPoblacion('');
 
     try {
-      const res = await api.post('param/poblacion/', {
+      const res = await mutacionPoblacion.mutateAsync({
         anio: parseInt(anioPoblacion, 10),
         poblacion: poblacion
       });
-      setExitoPoblacion(res.data?.message || 'Población y denominadores actualizados con éxito.');
-      if (res.data?.denominadores) {
-        setDenominadores(res.data.denominadores);
+      setExitoPoblacion(res?.message || 'Población y denominadores actualizados con éxito.');
+      if (res?.denominadores) {
+        setDenominadores(res.denominadores);
       }
       cargarPoblacion(anioPoblacion);
     } catch (err: any) {
@@ -198,9 +225,12 @@ export default function CargaYParametrizacionRem() {
   // Manejo de Modal Parametrización Metas y Celdas
   const abrirModalEditarMeta = (item: IndicadorParamInfo) => {
     setMetaSeleccionada(item);
+    setMensajeErrorMeta('');
     setFormMeta({
       meta_valor: item.meta_valor || '',
       ponderacion: item.ponderacion || '',
+      forma_calculo: item.forma_calculo || 'PORCENTAJE',
+      orientacion: item.orientacion || 'MAYOR_MEJOR',
       num_hoja: item.num_hoja || 'REM A24',
       num_celda: item.num_celda || '',
       num_descripcion: item.num_descripcion || ''
@@ -213,24 +243,28 @@ export default function CargaYParametrizacionRem() {
     if (!metaSeleccionada) return;
 
     setGuardandoMeta(true);
+    setMensajeErrorMeta('');
     try {
-      const res = await api.post('param/parametrizar-metas-celdas/', {
+      const res = await mutacionMeta.mutateAsync({
         indicador_id: metaSeleccionada.id,
         anio: parseInt(anioPoblacion, 10),
         meta_valor: formMeta.meta_valor,
         ponderacion: formMeta.ponderacion,
+        forma_calculo: formMeta.forma_calculo,
+        orientacion: formMeta.orientacion,
         num_hoja: formMeta.num_hoja,
         num_celda: formMeta.num_celda,
         num_descripcion: formMeta.num_descripcion
       });
 
-      setMensajeExitoMeta(res.data?.message || 'Parámetros actualizados.');
+      setMensajeExitoMeta(res?.message || 'Parámetros actualizados con éxito.');
       setModalMetaAbierto(false);
       cargarMetasYCeldas(anioPoblacion);
       setTimeout(() => setMensajeExitoMeta(''), 4000);
     } catch (err: any) {
       console.error('Error al parametrizar meta y celda:', err);
-      alert('Error al guardar los parámetros de celda y meta en el servidor.');
+      const msg = err.response?.data?.error || 'Error al guardar los parámetros de celda y meta en el servidor.';
+      setMensajeErrorMeta(msg);
     } finally {
       setGuardandoMeta(false);
     }
@@ -245,6 +279,9 @@ export default function CargaYParametrizacionRem() {
     if (e.target.files && e.target.files[0]) {
       setArchivo(e.target.files[0]);
       setErrorArchivo('');
+      setErroresDetalle([]);
+      setAdvertenciasDetalle([]);
+      setResultadoArchivo(null);
     }
   };
 
@@ -257,6 +294,8 @@ export default function CargaYParametrizacionRem() {
 
     setCargandoArchivo(true);
     setErrorArchivo('');
+    setErroresDetalle([]);
+    setAdvertenciasDetalle([]);
     setResultadoArchivo(null);
 
     const formData = new FormData();
@@ -264,19 +303,26 @@ export default function CargaYParametrizacionRem() {
     formData.append('parametros', JSON.stringify(parametros));
 
     try {
-      const res = await api.post('rem/upload/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const res = await mutacionUploadRem.mutateAsync(formData);
       setResultadoArchivo({
         status: 'success',
-        filename: res.data.filename || archivo.name,
-        registrosProcesados: res.data.hojas ? `${res.data.hojas} hojas REM procesadas` : 'Planilla procesada',
-        establecimiento: res.data.establecimiento || 'CESFAM Santa Rosa (210450)',
-        periodo: res.data.periodo || 'Año 2026',
+        filename: res.filename || archivo.name,
+        registrosProcesados: res.hojas ? `${res.hojas} hojas REM procesadas` : 'Planilla procesada',
+        establecimiento: res.establecimiento || 'CESFAM Santa Rosa (210450)',
+        periodo: res.periodo || 'Año 2026',
       });
+      if (res.advertencias) {
+        setAdvertenciasDetalle(res.advertencias);
+      }
     } catch (err: any) {
       console.error('Error al subir REM:', err);
       setErrorArchivo(err.response?.data?.error || 'Error al procesar el archivo REM en el servidor.');
+      if (err.response?.data?.errores_detalle) {
+        setErroresDetalle(err.response.data.errores_detalle);
+      }
+      if (err.response?.data?.advertencias) {
+        setAdvertenciasDetalle(err.response.data.advertencias);
+      }
     } finally {
       setCargandoArchivo(false);
     }
@@ -869,8 +915,20 @@ export default function CargaYParametrizacionRem() {
                 </div>
 
                 <form onSubmit={handleGuardarMetaYCeldas} className="space-y-4 text-xs">
+                  {mensajeErrorMeta && (
+                    <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-xl flex items-center gap-2 text-xs font-semibold">
+                      <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+                      <span>{mensajeErrorMeta}</span>
+                    </div>
+                  )}
+
                   <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 text-blue-950">
-                    <p className="font-bold text-[11px] uppercase tracking-wider mb-0.5">Fórmula Oficial MINSAL:</p>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <p className="font-bold text-[11px] uppercase tracking-wider">Fórmula Oficial MINSAL:</p>
+                      <span className="px-2 py-0.5 rounded bg-blue-100/80 text-blue-800 font-bold text-[9px] uppercase tracking-wider border border-blue-200">
+                        Evaluador Seguro: simpleeval
+                      </span>
+                    </div>
                     <p className="font-medium text-[11px] leading-relaxed">{metaSeleccionada.formula_display}</p>
                   </div>
 
@@ -894,6 +952,33 @@ export default function CargaYParametrizacionRem() {
                         placeholder="Ej: 4.00"
                         className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-bold text-slate-900 focus:outline-none focus:bg-white"
                       />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Forma de Cálculo (Fórmula)</label>
+                      <select
+                        value={formMeta.forma_calculo}
+                        onChange={(e) => setFormMeta({ ...formMeta, forma_calculo: e.target.value })}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-semibold text-slate-900 focus:outline-none focus:bg-white"
+                      >
+                        <option value="PORCENTAJE">Porcentaje (N / D × 100)</option>
+                        <option value="TASA">Tasa (N / D × 10.000)</option>
+                        <option value="RAZON">Razón (N / D)</option>
+                        <option value="VALOR">Valor directo (solo N)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Orientación de la Meta</label>
+                      <select
+                        value={formMeta.orientacion}
+                        onChange={(e) => setFormMeta({ ...formMeta, orientacion: e.target.value })}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-semibold text-slate-900 focus:outline-none focus:bg-white"
+                      >
+                        <option value="MAYOR_MEJOR">Mayor es mejor (≥ meta)</option>
+                        <option value="MENOR_MEJOR">Menor es mejor (≤ meta)</option>
+                      </select>
                     </div>
                   </div>
 
@@ -922,6 +1007,9 @@ export default function CargaYParametrizacionRem() {
                           placeholder="Ej: D14 o H11:X11 o D11-F11"
                           className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-semibold text-slate-900 focus:outline-none focus:bg-white"
                         />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Evaluado de forma segura con <strong>simpleeval</strong> (soporta celdas, rangos y sumas/restas).
+                        </p>
                       </div>
                     </div>
 
@@ -990,9 +1078,84 @@ export default function CargaYParametrizacionRem() {
           </div>
 
           {errorArchivo && (
-            <div className="rounded-xl bg-orange-50 p-4 text-sm text-orange-800 border border-orange-200 shadow-sm flex items-center gap-2">
-              <AlertTriangle size={18} className="shrink-0" />
-              <span className="font-medium">{errorArchivo}</span>
+            <div className="rounded-2xl bg-rose-50 p-4 text-sm text-rose-900 border border-rose-200 shadow-sm flex items-center gap-2">
+              <AlertTriangle size={18} className="text-rose-600 shrink-0" />
+              <span className="font-semibold">{errorArchivo}</span>
+            </div>
+          )}
+
+          {/* Tabla de Errores por Fila y Columna */}
+          {erroresDetalle.length > 0 && (
+            <div className="bg-white border-2 border-rose-300 rounded-2xl p-5 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-rose-100 pb-3">
+                <div className="flex items-center gap-2 text-rose-900 font-bold text-sm">
+                  <AlertTriangle className="text-rose-600 shrink-0" size={18} />
+                  <span>Inconsistencias Detectadas por Fila y Columna ({erroresDetalle.length} errores)</span>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 uppercase">
+                  Rechazo de Planilla
+                </span>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 font-bold text-slate-600 uppercase tracking-wider text-[11px]">
+                      <th className="py-2.5 px-3">Hoja REM</th>
+                      <th className="py-2.5 px-3 text-center">Fila</th>
+                      <th className="py-2.5 px-3 text-center">Columna</th>
+                      <th className="py-2.5 px-3 text-center">Celda</th>
+                      <th className="py-2.5 px-3">Tipo Error</th>
+                      <th className="py-2.5 px-3">Mensaje y Causa</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {erroresDetalle.map((err, idx) => (
+                      <tr key={idx} className="hover:bg-rose-50/40 transition">
+                        <td className="py-2.5 px-3 font-black text-blue-950 whitespace-nowrap">
+                          {err.hoja}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900">
+                          {err.fila}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900">
+                          {err.columna}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-bold text-rose-700">
+                          <span className="px-1.5 py-0.5 rounded bg-rose-50 border border-rose-200">
+                            {err.celda}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 uppercase">
+                            {err.tipo}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-700 font-medium leading-relaxed">
+                          {err.mensaje}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Advertencias no bloqueantes */}
+          {advertenciasDetalle.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
+              <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                <span>Observaciones y Advertencias de Validación ({advertenciasDetalle.length})</span>
+              </div>
+              <ul className="text-xs text-amber-800 list-disc list-inside space-y-1">
+                {advertenciasDetalle.map((adv, idx) => (
+                  <li key={idx}>
+                    <strong>Hoja {adv.hoja}:</strong> {adv.mensaje}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

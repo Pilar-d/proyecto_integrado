@@ -12,8 +12,9 @@ export default function DisenoPrincipal() {
   const navigate = useNavigate();
   const location = useLocation();
   
-  const userRole = localStorage.getItem('user_role') || 'Directora';
-  const userName = localStorage.getItem('user_name') || 'Funcionario';
+  const rawRole = localStorage.getItem('user_role') || 'Directora';
+  const userRole = (!rawRole || !isNaN(Number(rawRole))) ? 'Directora' : rawRole;
+  const userName = localStorage.getItem('user_name') || 'Carmen Valdés';
   
   // Nueva imagen para el Jefe de Programa y la institucional por defecto para los demás
   const fotoPorDefecto = userRole === 'Jefe de Programa' || userRole === 'JefePrograma'

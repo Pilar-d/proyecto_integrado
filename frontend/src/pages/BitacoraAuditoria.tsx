@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   ShieldCheck, Filter, Calendar, User, Activity, Clock, Search, 
   ChevronDown, ChevronUp, FileText, CheckCircle2, AlertCircle, 
   RefreshCw, Download, Database, Layers, ArrowRight 
 } from 'lucide-react';
-import api from '../api/axios';
+import { useBitacoraAuditoriaQuery } from '../api/queries';
 
 interface UsuarioDetalle {
   id: number;
@@ -38,32 +38,17 @@ const ACCIONES_LABEL: Record<string, { label: string; color: string }> = {
 };
 
 export default function BitacoraAuditoria() {
-  const [registros, setRegistros] = useState<RegistroAuditoria[]>([]);
-  const [cargando, setCargando] = useState(false);
-  const [error, setError] = useState('');
+  const { data, isLoading: cargando, isError, refetch: cargarBitacora, isFetching } = useBitacoraAuditoriaQuery();
+  const registros: RegistroAuditoria[] = data || [];
+  const error = isError ? 'No se pudo cargar la bitácora de auditoría. Verifique sus permisos de acceso.' : '';
 
   // Filtros
   const [busquedaTexto, setBusquedaTexto] = useState('');
   const [filtroAccion, setFiltroAccion] = useState('Todas');
+  const [filtroRol, setFiltroRol] = useState('Todos');
+  const [fechaInicio, setFechaInicio] = useState('');
+  const [fechaFin, setFechaFin] = useState('');
   const [idExpandido, setIdExpandido] = useState<number | null>(null);
-
-  const cargarBitacora = async () => {
-    setCargando(true);
-    setError('');
-    try {
-      const res = await api.get('registros-auditoria/');
-      setRegistros(res.data || []);
-    } catch (err: any) {
-      console.error('Error al cargar bitácora de auditoría:', err);
-      setError('No se pudo cargar la bitácora de auditoría. Verifique sus permisos de acceso.');
-    } finally {
-      setCargando(false);
-    }
-  };
-
-  useEffect(() => {
-    cargarBitacora();
-  }, []);
 
   const toggleExpandir = (id: number) => {
     setIdExpandido(idExpandido === id ? null : id);
@@ -77,7 +62,17 @@ export default function BitacoraAuditoria() {
     
     const coincideTexto = busquedaTexto.trim() === '' || textoBuscar.includes(busquedaTexto.toLowerCase());
     const coincideAccion = filtroAccion === 'Todas' || r.accion === filtroAccion;
-    return coincideTexto && coincideAccion;
+    const coincideRol = filtroRol === 'Todos' || r.rol_usuario.toLowerCase().includes(filtroRol.toLowerCase());
+
+    let coincideFecha = true;
+    if (fechaInicio) {
+      coincideFecha = coincideFecha && r.fecha_hora >= fechaInicio;
+    }
+    if (fechaFin) {
+      coincideFecha = coincideFecha && r.fecha_hora <= `${fechaFin}T23:59:59`;
+    }
+
+    return coincideTexto && coincideAccion && coincideRol && coincideFecha;
   });
 
   // Estadísticas rápidas
@@ -151,7 +146,7 @@ export default function BitacoraAuditoria() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={cargarBitacora}
+            onClick={() => cargarBitacora()}
             disabled={cargando}
             className="flex items-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200 px-4 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer"
             title="Recargar bitácora"
@@ -198,40 +193,98 @@ export default function BitacoraAuditoria() {
         </div>
       </div>
 
-      {/* Barra de Búsqueda y Filtros */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="relative flex-1 w-full">
-          <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
-          <input
-            type="text"
-            value={busquedaTexto}
-            onChange={(e) => setBusquedaTexto(e.target.value)}
-            placeholder="Buscar por funcionario, RUT, acción, IP o tabla afectada..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-xs bg-slate-50 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-900"
-          />
+      {/* Barra de Búsqueda y Filtros con Fechas, Roles y Acciones */}
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+        <div className="flex items-center gap-2 text-xs font-bold text-blue-950 uppercase tracking-wider pb-2 border-b border-slate-100">
+          <Filter size={15} />
+          <span>Filtros de Auditoría y Trazabilidad</span>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <label className="text-xs font-bold text-slate-600 whitespace-nowrap">Tipo de Acción:</label>
-          <select
-            value={filtroAccion}
-            onChange={(e) => setFiltroAccion(e.target.value)}
-            className="rounded-xl border border-slate-300 p-2.5 text-xs bg-slate-50 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-900 cursor-pointer"
-          >
-            <option value="Todas">Todas las acciones</option>
-            <option value="ACTUALIZAR_POBLACION_DENOMINADORES">Actualizar Población / Denominadores</option>
-            <option value="PARAMETRIZAR_META_CELDA">Parametrizar Meta / Celda REM</option>
-            <option value="CARGA_REM">Carga Planilla REM</option>
-            <option value="CREAR_USUARIO">Creación de Usuario</option>
-            <option value="MODIFICAR_USUARIO">Modificación de Usuario</option>
-          </select>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Búsqueda por texto */}
+          <div className="lg:col-span-2">
+            <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Buscar por Texto</label>
+            <div className="relative">
+              <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
+              <input
+                type="text"
+                value={busquedaTexto}
+                onChange={(e) => setBusquedaTexto(e.target.value)}
+                placeholder="Funcionario, RUT, IP, tabla..."
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-xs bg-slate-50 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-900"
+              />
+            </div>
+          </div>
 
-          {(busquedaTexto || filtroAccion !== 'Todas') && (
-            <button
-              onClick={() => { setBusquedaTexto(''); setFiltroAccion('Todas'); }}
-              className="text-xs font-bold text-rose-600 hover:underline cursor-pointer whitespace-nowrap"
+          {/* Filtro por Acción */}
+          <div>
+            <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Tipo de Acción</label>
+            <select
+              value={filtroAccion}
+              onChange={(e) => setFiltroAccion(e.target.value)}
+              className="w-full rounded-xl border border-slate-300 p-2.5 text-xs bg-slate-50 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-900 cursor-pointer"
             >
-              Limpiar
+              <option value="Todas">Todas las acciones</option>
+              <option value="ACTUALIZAR_POBLACION_DENOMINADORES">Actualizar Población / Denominadores</option>
+              <option value="PARAMETRIZAR_META_CELDA">Parametrizar Meta / Celda REM</option>
+              <option value="CARGA_REM">Carga Planilla REM</option>
+              <option value="CREAR_USUARIO">Creación de Usuario</option>
+              <option value="MODIFICAR_USUARIO">Modificación de Usuario</option>
+              <option value="LOGIN">Inicio de Sesión</option>
+            </select>
+          </div>
+
+          {/* Filtro por Rol */}
+          <div>
+            <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Rol de Funcionario</label>
+            <select
+              value={filtroRol}
+              onChange={(e) => setFiltroRol(e.target.value)}
+              className="w-full rounded-xl border border-slate-300 p-2.5 text-xs bg-slate-50 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-900 cursor-pointer"
+            >
+              <option value="Todos">Todos los roles</option>
+              <option value="Directora">Directora</option>
+              <option value="Subdireccion">Subdirección</option>
+              <option value="Gestor">Gestor de Información</option>
+              <option value="Jefe">Jefe de Programa</option>
+              <option value="Sistema">Sistema</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Filtros de Fecha Calendario */}
+        <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-slate-100 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-500">Fecha Desde:</span>
+            <input
+              type="date"
+              value={fechaInicio}
+              onChange={(e) => setFechaInicio(e.target.value)}
+              className="rounded-lg border border-slate-200 px-2.5 py-1 bg-slate-50 font-medium"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-500">Fecha Hasta:</span>
+            <input
+              type="date"
+              value={fechaFin}
+              onChange={(e) => setFechaFin(e.target.value)}
+              className="rounded-lg border border-slate-200 px-2.5 py-1 bg-slate-50 font-medium"
+            />
+          </div>
+
+          {(busquedaTexto || filtroAccion !== 'Todas' || filtroRol !== 'Todos' || fechaInicio || fechaFin) && (
+            <button
+              onClick={() => {
+                setBusquedaTexto('');
+                setFiltroAccion('Todas');
+                setFiltroRol('Todos');
+                setFechaInicio('');
+                setFechaFin('');
+              }}
+              className="text-xs font-bold text-rose-600 hover:underline cursor-pointer ml-auto"
+            >
+              Restablecer Filtros
             </button>
           )}
         </div>

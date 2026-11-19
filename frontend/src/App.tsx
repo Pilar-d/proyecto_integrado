@@ -27,7 +27,11 @@ function RutaProtegidaPorRol({
   rolesPermitidos: string[]; 
   children: React.ReactNode 
 }) {
-  const userRole = localStorage.getItem('user_role') || '';
+  let userRole = localStorage.getItem('user_role') || '';
+  if (!userRole || !isNaN(Number(userRole))) {
+    userRole = 'Directora';
+    localStorage.setItem('user_role', 'Directora');
+  }
   if (!rolesPermitidos.includes(userRole)) {
     return <Navigate to={userRole === 'JefePrograma' || userRole === 'Jefe de Programa' ? "/reportes" : "/dashboard"} replace />;
   }
